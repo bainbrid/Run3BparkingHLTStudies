@@ -1,7 +1,7 @@
 import copy, math, os
 from numpy import array
 #from CMGTools.H2TauTau.proto.plotter.categories_TauMu import cat_Inc
-from ROOT import TFile, TH1F, TH2F, TTree, gROOT, gStyle, TCanvas, TColor, kLightTemperature, TGraphErrors
+from ROOT import TFile, TH1F, TH2F, TTree, gROOT, gStyle, TCanvas, TColor, kLightTemperature, TGraphErrors, Double
 from DisplayManager import DisplayManager, add_Preliminary, add_CMS, add_label
 from officialStyle import officialStyle
 from array import array
@@ -15,9 +15,21 @@ gStyle.SetOptStat(0)
 gStyle.SetTitleOffset(1.0,"X")
 gStyle.SetTitleOffset(1.0,"Y")
 
+from optparse import OptionParser, OptionValueError
+usage = "usage: python compare_eff.py"
+parser = OptionParser(usage)
+parser.add_option('-w', '--weight', action="store_true", default=False, dest='weight')
+(options, args) = parser.parse_args()
 
-l1_ptrange = np.arange(5, 12.5, 0.5).tolist() 
-hlt_ptrange = np.arange(4, 12.5, 0.5).tolist() 
+# Analysis Acc. times Eff. map
+eff_histo = None
+if options.weight:
+    eff_file = TFile('eff.root')
+    eff_histo = eff_file.Get('eff')
+    print eff_histo, 'detected'
+
+l1_ptrange = np.arange(5, 12.5, 0.5).tolist() # 6, 11.5, 1.0
+hlt_ptrange = np.arange(4, 12.5, 0.5).tolist() # 6, 11.5, 1.0
 
 colours = [1, 2, 4, 6, 8, 13, 15]
 styles = [1, 2, 4, 3, 5, 1, 1]
@@ -212,8 +224,30 @@ h_gall.GetYaxis().SetTitle('HLT di-electron Y GeV')
 
 
 def calcEff(tree, denstr, numstr):
+    gen_pt  = 'gen_e1_pt > 0.5 && gen_e2_pt > 0.5'
+    gen_eta = 'abs(gen_e1_eta) < 2.4 && abs(gen_e2_eta) < 2.4'
     den = tree.GetEntries(denstr)
-    num = tree.GetEntries(numstr)
+    if not options.weight :
+        num = tree.GetEntries(numstr)
+    else :
+        num = 0
+        ybins = eff_histo.GetYaxis().GetNbins()
+        xbins = eff_histo.GetXaxis().GetNbins()
+        for ybin in range(1,ybins+1):
+            for xbin in range(1,xbins+1):
+                if xbin > ybin : continue
+                eff = eff_histo.GetBinContent(xbin,ybin)
+                y_down = eff_histo.GetYaxis().GetBinLowEdge(ybin)
+                y_up = eff_histo.GetYaxis().GetBinLowEdge(ybin) + eff_histo.GetYaxis().GetBinWidth(ybin)
+                x_down = eff_histo.GetXaxis().GetBinLowEdge(xbin)
+                x_up = eff_histo.GetXaxis().GetBinLowEdge(xbin) + eff_histo.GetXaxis().GetBinWidth(xbin)
+                gen_e1_pt = 'gen_e1_pt > ' + str(y_down)
+                if ybin < ybins : gen_e1_pt += ' && ' + 'gen_e1_pt < ' + str(y_up)
+                gen_e2_pt = 'gen_e2_pt > ' + str(x_down)
+                if xbin < xbins : gen_e2_pt += ' && ' + 'gen_e2_pt < ' + str(x_up)
+                newgencut = ' && '.join([gen_e1_pt, gen_e2_pt, gen_eta])
+                entry = Double(tree.GetEntries(numstr + ' && ' + newgencut))
+                num += entry*eff
 
     eff = float(num)/float(den)
 
@@ -226,7 +260,8 @@ qcut = 'e1_hlt_pms2 < 10000 && e1_hlt_invEInvP < 0.2 && e1_hlt_trkDEtaSeed < 0.0
 if True:
     for il1, l1_pt in enumerate(l1_ptrange):
         for ihlt, hlt_pt in enumerate(hlt_ptrange):
-        
+            print("".join(["#",str(il1*len(hlt_ptrange)+ihlt)," out of ",str(len(l1_ptrange)*len(hlt_ptrange))]))
+
             sel_inclusive = '1'
             sel_den = 'gen_e1_l1_dr < 0.2 && gen_e2_l1_dr < 0.2 && e1_l1_pt > ' + str(l1_pt) + ' && e2_l1_pt > ' + str(l1_pt)
             
@@ -246,7 +281,9 @@ if True:
             h_gall.SetBinContent(il1+1, ihlt+1, calcEff(tree, sel_inclusive, sel_all))
 
 
-    ofile = TFile('effmap.root', 'recreate')
+    ofile = None
+    if not options.weight: ofile = TFile('effmap.root', 'recreate')
+    else:                  ofile = TFile('effmap_weighted.root', 'recreate')
     h_e1.Write()
     h_e2.Write()
     h_e1e2.Write()
@@ -256,15 +293,10 @@ if True:
     ofile.Write()
     ofile.Close()
 
-        
-    
-
-filedict = {'sig_e1': {'file':file, 'sel':'gen_e1_l1_dr < 0.2 && gen_e2_l1_dr < 0.2 && e1_l1_pt > 6 && e2_l1_pt > 6 && gen_e1_hlt_dr < 0.2'},
-            'sig_e2': {'file':file, 'sel':'gen_e1_l1_dr < 0.2 && gen_e2_l1_dr < 0.2 && e1_l1_pt > 6 && e2_l1_pt > 6 && gen_e1_hlt_dr < 0.2 && gen_e2_hlt_dr < 0.2'},
-            'data': {'file':TFile('out_data_4gev_22.root'), 'sel':'isgjson==1 && l1_doubleE6==1'}}
-
-
 if False:
+    filedict = {'sig_e1': {'file':file, 'sel':'gen_e1_l1_dr < 0.2 && gen_e2_l1_dr < 0.2 && e1_l1_pt > 6 && e2_l1_pt > 6 && gen_e1_hlt_dr < 0.2'},
+                'sig_e2': {'file':file, 'sel':'gen_e1_l1_dr < 0.2 && gen_e2_l1_dr < 0.2 && e1_l1_pt > 6 && e2_l1_pt > 6 && gen_e1_hlt_dr < 0.2 && gen_e2_hlt_dr < 0.2'},
+                'data': {'file':TFile('out_data_4gev_22.root'), 'sel':'isgjson==1 && l1_doubleE6==1'}}
     for vkey, ivar in vardict.items():
 
         print(vkey)

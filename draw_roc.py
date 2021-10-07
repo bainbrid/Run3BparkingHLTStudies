@@ -3,8 +3,8 @@ from ROOT import TFile, TH1F, TH2F, TTree, gROOT, gStyle, TCanvas, TLegend, TGra
 from officialStyle import officialStyle
 import numpy as np
 
-l1_ptrange = np.arange(6, 11.5, 1).tolist() 
-hlt_ptrange = np.arange(4, 11.5, 1).tolist() 
+l1_ptrange = np.arange(6, 11.5, 1).tolist() # 6, 11.5, 1
+hlt_ptrange = np.arange(4, 11.5, 1).tolist() # 6, 11.5, 1
 
 print('l1', l1_ptrange)
 print('hlt', hlt_ptrange)
@@ -17,7 +17,7 @@ gStyle.SetOptStat(0)
 from optparse import OptionParser, OptionValueError
 usage = "usage: python runTauDisplay_BsTauTau.py"
 parser = OptionParser(usage)
-parser.add_option('-w', '--weight', action="store_true", default=True, dest='weight')
+parser.add_option('-w', '--weight', action="store_true", default=False, dest='weight')
 parser.add_option("-l", "--lumi", default=1.0, type="float", help="target lumi. with [E34]", dest="lumi")
 (options, args) = parser.parse_args()
 
@@ -57,7 +57,9 @@ def applyLegendSettings(leg):
 
 
 file_rate = TFile('ratemap.root')
-file_eff = TFile('effmap.root')
+file_eff = None
+if not options.weight: file_eff = TFile('effmap.root')
+else: file_eff = TFile('effmap_weighted.root')
 
 ratemap = file_rate.Get('rate')
 effmap = file_eff.Get('gall')
@@ -97,7 +99,8 @@ canvas.SetGridy()
 
 frame_roc = TH2F('frame', 'frame', 100, 0.000003, 0.01, 1000, 1, 100000)
 
-frame_roc.GetXaxis().SetTitle('L1 x HLT Trigger eff.')
+if not options.weight: frame_roc.GetXaxis().SetTitle('L1 x HLT Trigger eff.')
+else: frame_roc.GetXaxis().SetTitle('L1 x HLT x Analysis eff.')
 frame_roc.GetYaxis().SetTitle('Rate @ PU ~ 40')
 frame_roc.Draw()
 
@@ -117,5 +120,9 @@ for idx, graph in enumerate(graphs):
 
     
 leg.Draw()
-canvas.SaveAs('roc_hlt.gif')
-canvas.SaveAs('roc_hlt.pdf')
+if not options.weight:
+    canvas.SaveAs('roc_hlt.gif')
+    canvas.SaveAs('roc_hlt.pdf')
+else:
+    canvas.SaveAs('roc_hlt_weighted.gif')
+    canvas.SaveAs('roc_hlt_weighted.pdf')

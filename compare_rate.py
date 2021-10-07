@@ -15,8 +15,8 @@ gStyle.SetOptStat(0)
 gStyle.SetTitleOffset(1.0,"X")
 gStyle.SetTitleOffset(1.0,"Y")
 
-l1_ptrange = np.arange(5, 12.5, 0.5).tolist() 
-hlt_ptrange = np.arange(4, 12.5, 0.5).tolist() 
+l1_ptrange = np.arange(5, 12.5, 0.5).tolist() # 6, 11.5, 1.0
+hlt_ptrange = np.arange(4, 12.5, 0.5).tolist() # 6, 11.5, 1.0
 
 colours = [1, 2, 4, 6, 8, 13, 15]
 styles = [1, 2, 4, 3, 5, 1, 1]

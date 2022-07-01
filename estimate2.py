@@ -76,21 +76,28 @@ switch_lumi = [(2.2, 2.0),
 
 # List of nPU values to consider
 # nPU = (Linst+0.0011904)/0.0357388
-switch_npu = [56, # NEED TO UPDATE FOR HIGHEST LINST?
+switch_npu = [62, # NEED TO UPDATE FOR HIGHEST LINST?
               56, 48, 42, 36, 30, 25,
               17, 17, 17, 17] # NEED TO UPDATE FOR LOWER LINST
 
 # Maximum L1 trigger bandwidth
 l1_max = 95000.
 
-# Rate dedicated to new di-muon seeds in Run 3
+# Rate (in Hz??) dedicated to new di-muon seeds in Run 3
 #dimuon = 0. # Redundant?
+
+# Rate (in kHz !!) dedicated to single-muon seed in Run 3
+single_muon = 5.
 
 # Determine correction to L1 rate for total CMS menu
 # i.e. ensure rate does not exceed l1_max @ 2E34 (i.e. remove any overspend)
 idx_2e34 = 1
 l1_rate_2e34 = l1_his.Eval(switch_lumi[idx_2e34][0])
 l1_rate_corr = max(0.,l1_rate_2e34-l1_max) # correct overspend only
+
+idx_1p7e34 = 2
+l1_rate_1p7e34 = l1_his.Eval(switch_lumi[idx_1p7e34][0])
+l1_rate_1p7e34 -= l1_rate_corr
 
 # List of peak L_inst (upper bounds from switch_lumi, list of 2-tuples ...)
 peak_lumis = [ h for (h,l) in switch_lumi ]
@@ -168,7 +175,7 @@ for idx,profile in enumerate(profiles):
     graphs = []
 
     # Dedicated L1 rate allocation
-    allocations = [0,5000,10000,20000]
+    allocations = [0,5000,10000,20000][1:2]
 
     # Iterate through different rate allocations
     for style,allocation in enumerate(allocations):
@@ -238,6 +245,9 @@ for idx,profile in enumerate(profiles):
             # Determine L1 spare capacity 
             spare = l1_max - l1_rate # APPLY CMS-WIDE PRESCALE HERE (IF REQUIRED)!
 
+            # HACK TO ACCOUNT FOR SINGLE MUON RATE (NORMALISED TO 5 KHZ)
+            mu_rate = single_muon * 1.e3 * l1_rate/l1_rate_1p7e34 if which_lumi < idx_1p7e34 else 0.
+
             # Scale (i.e. "decay") di-electron rate allocation according to L_inst
             alloc = allocation*(l1_rate/(l1_rate_2e34-l1_rate_corr)) # allocation scaled down by lumi
 
@@ -257,7 +267,7 @@ for idx,profile in enumerate(profiles):
                 ee_rate = hackRate(ee_rate,which_lumi) # <<< HACK HACK HACK
 
                 # Check if the L1 di-ele rate satisfies the dedicate rate allocation or spare capacity
-                l1_ok = ee_rate < (alloc+1.e-6) or ee_rate < (spare+alloc+1.e-6) # spare + epsilon
+                l1_ok = ee_rate < (alloc+1.e-6) or ee_rate < (alloc+spare-mu_rate+1.e-6) # spare + epsilon
                 if l1_ok:
                     which_l1pt = pt
                     flag_park = True
@@ -290,13 +300,13 @@ for idx,profile in enumerate(profiles):
                 ee_rate = hackRate(ee_rate,which_lumi) # <<< HACK HACK HACK
 
                 # Determine prescale to apply
-                l1_rate_max = max(alloc,spare+alloc)-1.e-6 # max allowed? (minus epsilon)
+                l1_rate_max = max(alloc,alloc+spare-mu_rate)-1.e-6 # max allowed? (minus epsilon)
                 prescale = ee_rate/l1_rate_max if l1_rate_max > 0. else 1.
                 prescale = max(prescale,1.) # Ensure prescale >= 1.
                 ee_rate = ee_rate / prescale # Apply prescale
 
                 # Check if the L1 di-ele rate satisfies the dedicate rate allocation or spare capacity
-                l1_ok = ee_rate < (alloc+1.e-6) or ee_rate < (spare+alloc+1.e-6) # spare + epsilon
+                l1_ok = ee_rate < (alloc+1.e-6) or ee_rate < (alloc+spare-mu_rate+1.e-6) # spare + epsilon
                 if l1_ok:
                     which_l1pt = pt_max
                     flag_park = True
@@ -383,13 +393,15 @@ for idx,profile in enumerate(profiles):
                               "Peak:",str("{:4.2f}".format(which_lumi)),
                               "Linst:",str("{:.3f}".format(Linst)),
                               "Lint:",str("{:.3f}".format(total_lumi)),
-                              "spare:",str("{:5.0f}".format(spare+allocation)),
+                              "alloc:",str("{:5.0f}".format(alloc)),
+                              "spare:",str("{:5.0f}".format(spare)),
                               "pT:",str("{:4.1f}".format(which_l1pt)),
                               "L1 rate:",str("{:5.0f}".format(l1_ee_rate)),
+                              "mu rate:",str("{:5.0f}".format(mu_rate)),
                               "HLT rate:",str("{:5.0f}".format(hlt_rate)),
                               "HLT eff:",str("{:.6f}".format(hlt_eff)),
                               "N:",str("{:6.3f}".format(total_count)),
-                              "prescale:",str("{:5.1f}".format(prescale)),
+                              str("prescale: {:5.1f}".format(prescale) if options.prescaled else ""),
                           ]))
  
         graphs.append(copy.deepcopy(graph))
@@ -571,30 +583,35 @@ for name,counts in reversed(dct.items()):
     print()
 
 nfills = {}
-nfills['levelled_at_2p0e34'] = 12
-nfills['levelled_at_1p7e34'] = 12
-nfills['levelled_at_1p5e34'] = 12
-nfills['levelled_at_1p3e34'] = 12
-nfills['levelled_at_1p1e34'] = 12
-nfills['levelled_at_0p9e34'] = 12
-nfills['levelled_at_0p7e34'] = 3
-nfills['levelled_at_0p4e34'] = 3
-nfills['levelled_at_0p2e34'] = 3
 #nfills['falling_from_1p8e34'] = 1
+nfills['levelled_at_0p2e34'] = 3
+nfills['levelled_at_0p4e34'] = 3
+nfills['levelled_at_0p7e34'] = 3
+nfills['levelled_at_0p9e34'] = 12
+nfills['levelled_at_1p1e34'] = 12
+nfills['levelled_at_1p3e34'] = 12
+nfills['levelled_at_1p5e34'] = 12
+nfills['levelled_at_1p7e34'] = 12
+nfills['levelled_at_2p0e34'] = 12
 
 print("All fills (Lint/fill, Nfills, Lint all fills, Counts for each allocation):")
+Lint_total = 0.
 total = [0.]*len(allocations)
 for name,counts in reversed(dct.items()):
     print(name," ",end="")
-    print("{:4.2f}".format(counts[allocations[0]][0])," ",end="")
-    print("{:2.0f}".format(nfills.get(name,1.))," ",end="")
-    print("{:5.2f}".format(counts[allocations[0]][0]*nfills.get(name,1.))," ",end="")
+    Lint = counts[allocations[0]][0]
+    nfill = nfills.get(name,1.)
+    Lint_total += Lint*nfill
+    print("{:4.2f}".format(Lint)," ",end="")
+    print("{:2.0f}".format(nfill)," ",end="")
+    print("{:5.2f}".format(Lint*nfill)," ",end="")
     for ialloc,alloc in enumerate(allocations): 
-        tot = counts[alloc][1]*nfills.get(name,1.)
+        count = counts[alloc][1]
+        tot = count*nfill
         print("{:6.1f}".format(tot)," ",end="")
         total[ialloc] += tot
     print()
-print(" "*36,"  ".join(["{:6.1f}".format(t) for t in total]))
+print(" "*29,"{:5.2f} ".format(Lint_total),"  ".join(["{:6.1f}".format(t) for t in total]))
 
 dct2 = {}
 total_dt = 0.

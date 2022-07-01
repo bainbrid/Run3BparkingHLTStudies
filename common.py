@@ -11,7 +11,7 @@ from ROOT import TDatime, TFile, TGraph
 # Define comon path to input files (i.e. either EOS or local)
 
 local=False
-common_path='./root/' if local else '/eos/cms/store/group/phys_bphys/bpark/RootFiles4Run3Parking/'
+common_path='./root/' if local else '/eos/cms/store/group/phys_bphys/DiElectronX/RootFiles4Run3Parking/'
 
 ################################################################################
 

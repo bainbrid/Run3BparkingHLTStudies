@@ -65,16 +65,18 @@ nfills = 100
 integrated_lumi = 86.4 # 12-hour fill @ 2E34 delivers 0.864/fb 
 
 # L1 and HLT pT thresholds
-l1_pts = np.arange(4.,11.,0.5).tolist()
-hlt_pts = np.arange(4.,11.,0.5).tolist()
+l1_pts = np.arange(4.,11.5,0.5).tolist()
+hlt_pts = np.arange(4.,11.0,0.5).tolist()
 
 # List of L_inst values to consider
 # Linst = nPU*0.0357338 - 0.0011904
-switch_lumi = [(2.0, 1.7), (1.7, 1.5), (1.5, 1.3), (1.3, 1.1), (1.1, 0.9), (0.9, 0.6), (0.6, 0.)]
+switch_lumi = [#(2.2, 2.0),
+               (2.0, 1.7), (1.7, 1.5), (1.5, 1.3), (1.3, 1.1), (1.1, 0.9), (0.9, 0.6), (0.6, 0.)]
 
 # List of nPU values to consider
 # nPU = (Linst+0.0011904)/0.0357388
-switch_npu = [56, 48, 42, 36, 30, 25, 17]
+switch_npu = [#62,
+              56, 48, 42, 36, 30, 25, 17]
 
 # Maximum L1 trigger bandwidth
 l1_max = 95000.

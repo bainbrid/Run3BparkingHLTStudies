@@ -71,10 +71,14 @@ The script will loop over relevant npu:
 and create the ROOT files containing each ROC curve, to be later used in the next step (estimate.py). If you want to have different npu, you can just edit the last few lines of ```draw_roc.py```.
 
 
-# 5. estimate Kee events
+# 5. Estimate number of Kee candidates
+
+Provides the menus and various tables of useful metrics:
 ```
-python3 estimate.py 
+python3 metrics.py 
 ```
 
-This will make a predictions about # of expected Kee events assuming 2018 like scenario (taken Fill 7321 as reference) or paseudo Run3 lumi profile (again taken from Fill 7321 but inserted 6h of lumi-levelling at the beginning with 2E34 and fall aftewards). 
-
+Provides estimates per LHC fill (based on a pseudo LHC luminosity profiles):
+```
+python3 estimate2.py 
+```

@@ -68,10 +68,10 @@ max_bw_hlt = {
 
 ################################################################################
 # Pairwise (L1,HLT) thresholds to avoid "vertical regions" in ROCs
-l1_threshold_list = np.arange(4, 11, 0.5).tolist()
+l1_threshold_list = np.arange(4, 11.5, 0.5).tolist()
 hlt_threshold_list = [4.0,4.0,4.0,4.0,4.0, # L1: 4.0->6.0
                       4.5,5.0,5.0,5.0,5.5, # L1: 6.5->8.5
-                      6.0,6.5,6.5,6.5,     # L1: 9.0->10.5
+                      6.0,6.5,6.5,6.5,6.5  # L1: 9.0->11.0
                       ]
 hlt_threshold_dict = dict(zip(l1_threshold_list,hlt_threshold_list))
 
@@ -264,6 +264,17 @@ def hackRate(rate,which_lumi):
     except ValueError: return rate
     if idx is not None and idx>0: return rate * linst[idx]/linst[0]
     else : return rate
+
+def hackRateNPU(rate,npu):
+    #linst=[0.6,0.45,0.30,0.15]
+    npus=[17,25,30,36,42,48,56]
+    if npu < npus[0] : return rate * (npu/npus[0])
+    else : return rate
+#    idx=None
+#    try: idx = npu.index(npus)
+#    except ValueError: return rate
+#    if idx is not None and idx>0: return rate * npus[idx]/npus[0]
+#    else : return rate
 
 def scaleGraph(graph,scale) :
     for i in range(graph.GetN()) :

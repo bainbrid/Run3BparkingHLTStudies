@@ -80,7 +80,7 @@ switch_npu = [62, # NEED TO UPDATE FOR HIGHEST LINST?
               56, 48, 42, 36, 30, 25,
               17, 17, 17, 17] # NEED TO UPDATE FOR LOWER LINST
 
-# Maximum L1 trigger bandwidth
+# Maximum L1 trigger bandwidth [Hz]
 l1_max = 95000.
 
 # Rate (in Hz??) dedicated to new di-muon seeds in Run 3
@@ -175,7 +175,7 @@ for idx,profile in enumerate(profiles):
     graphs = []
 
     # Dedicated L1 rate allocation
-    allocations = [0,5000,10000,20000][1:2]
+    allocations = [0,5000,10000,20000][1:2] # Just 5k for now ...
 
     # Iterate through different rate allocations
     for style,allocation in enumerate(allocations):

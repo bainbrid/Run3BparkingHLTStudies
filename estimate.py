@@ -1,480 +1,666 @@
-from ROOT import TDatime, TGraph, TFile, TH1F, TCanvas, TLegend, gROOT, gStyle, TH2F, kGray
-from ctypes import c_double
-from DisplayManager import DisplayManager, add_Preliminary, add_CMS, add_label, applyLegendSettings
-from officialStyle import officialStyle
-import numpy as np
-import os, sys, copy
-from common import common_path
+# Local environment:
+# conda activate root.6.26.0
+# python metrics.py
 
+################################################################################
+# Imports
+from __future__ import print_function
+from ROOT import TDatime, TGraph, TFile, TH1F, TCanvas, TLegend, gROOT, gStyle, TH2F, TGaxis, gPad, TLine, TPaveText, TLatex, kBlue, kRed, kBlack
+from DisplayManager import DisplayManager, add_Preliminary, add_Private, add_CMS, add_lumi, applyLegendSettings
+from officialStyle import officialStyle
+from ctypes import c_double
+import copy, os, sys
+import numpy as np
+import json
+
+################################################################################
+# Common definitions 
+from common import ensureDir, common_path, dr_dict, hackRate, \
+    hlt_threshold_dict, fB, Sigma_B, Br_kee, createLumiProfiles, scaleGraph
+
+################################################################################
+# Plotting
 gROOT.SetBatch(True)
 officialStyle(gStyle)
 gStyle.SetOptTitle(0)
 gStyle.SetOptStat(0)
 
+################################################################################
+# Command line configuration
 
-######### input parameters
+from optparse import OptionParser, OptionValueError
+usage = "usage: python runTauDisplay_BsTauTau.py"
+parser = OptionParser(usage)
+parser.add_option('-c', '--corrected', # obsolete now we have "official" rates?
+                  action="store_true",
+                  default=False,
+                  dest='corrected',
+                  help="apply trigger rates correction factor")
+parser.add_option('-l', '--limit', # obsolete?
+                  action="store_true",
+                  default=False,
+                  dest='limit',
+                  help="limit HLT rate to 300 Hz")
+parser.add_option('-p', '--prescaled', # prescale-adjusted approach ...
+                  action="store_true",
+                  default=False,
+                  dest='prescaled',
+                  help="Adjust prescales rather than pT thresholds at L1")
+(options, args) = parser.parse_args()
 
+################################################################################
+# Configuration
 
-def ensureDir(directory):
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-
-
+# Output dir for plots
 ensureDir('plots/')
 
-lumi_level = 20160 # 6h*3600s/h
-# http://www.lpthe.jussieu.fr/~cacciari/fonll/fonllform.html
-# truely inclusive cross-section
-fB = 0.4
-Sigma_B = 4.6940e+08 # pb
-Br_kee = 2*4.5e-7
-
-#prompt_hlt_bw = 100.
-integrated_lumi = 25.
-
-
-l1_ptrange = np.arange(5, 11, 0.5).tolist() 
-#l1_ptrange = np.arange(5, 11, 1.0).tolist() 
-lumi_range = np.arange(0, lumi_level, 20).tolist() 
-
-
-drdict = {
-    4.0:1.0,
-    4.5:0.9,
-    5.0:0.9,
-    5.5:0.8,
-    6.0:0.8,
-    6.5:0.8,
-    7.0:0.8,
-    7.5:0.7,
-    8.0:0.7,
-    8.5:0.7,
-    9.0:0.7,
-    9.5:0.6,
-    10.0:0.6,
-    10.5:0.6,
-    11.0:0.6,
-    11.5:0.5,
-    12.0:0.5,
-    12.5:0.5,
-    13.0:0.5,
-    13.5:0.4,
-    14.0:0.4,
-}   
-
-
-
-# create Luminosity profile ... 
-
-lumiprofile2output = 'root/lumiprof.root'
-
-if not os.path.exists(lumiprofile2output):
-
-    ##https://cmsoms.cern.ch/cms/runs/report?cms_run=324980&cms_run_sequence=GLOBAL-RUN
-    ##"324980": [[39, 917], [919, 954], [956, 968], [1005, 1042], [1044, 2340]],
-    golden = [[53, 917], [919, 954], [956, 968], [1005, 1042], [1044, 2340]]
-
-    times_ = []
-    lumis = []
-
-    for line in open('LumiData/LumiData_2018_20200401.csv', 'r'):
-
-        if line.find('324980:7321')==-1: continue
-
-        line = line.rstrip().split(',')
-        ls = line[1].split(':')[0]
-
-
-        flag = False
-
-        for lrange in golden:
-            if int(ls) >= min(lrange) and int(ls) <= max(lrange):
-                flag = True
-    
-
-        if not flag: continue
-
-        time = line[2].split(' ')
-    
-        instL = float(line[5])*0.0001
-
-        time_ = TDatime(int(time[0].split('/')[2])+2000, int(time[0].split('/')[0]), int(time[0].split('/')[1]), int(time[1].split(':')[0]), int(time[1].split(':')[1]), int(time[1].split(':')[2]))
-
-        times_.append(time_.Convert())
-        lumis.append(instL)
-
-
-
-
-    min_times = min(times_)
-
-    times = [number - min_times for number in times_]
-    
-
-    graph = TGraph()
-    graph.SetName('lumiprofile')
-    graph.SetTitle('lumiprofile')
-
-    idx = 0
-    for time, lumi in zip(times, lumis):
-        graph.SetPoint(idx, time, lumi)
-
-        idx += 1
-
-
-
-
-    graph_ll = TGraph()
-    graph_ll.SetName('lumiprofile_ll')
-    graph_ll.SetTitle('lumiprofile_ll')
-
-
-    idx = 0
-
-    for ii in lumi_range:
-        graph_ll.SetPoint(idx, ii, 2.)
-
-        idx+=1
-
-    times = [number - min_times + lumi_level  for number in times_]
-
-
-    for time, lumi in zip(times, lumis):
-        graph_ll.SetPoint(idx, time, lumi + 0.2)
-
-        if time > 39600:
-            break
-
-        idx += 1
-
-
-
-    file = TFile(lumiprofile2output, 'recreate')
-    graph.Write()
-    graph_ll.Write()
-    file.Write()
-    file.Close()
-
-
-
-    
-file = TFile(lumiprofile2output)
-
-graph_norm = file.Get('lumiprofile')
-graph_ll = file.Get('lumiprofile_ll')
-
-
-# This will be replaced once Sebastian derive realistic L1/HLT rates
+# Level-1 total rate estimate for full CMS menu
 l1_file = TFile(common_path+'ee/l1_bandwidth.root')
-l1_file_official = TFile(common_path+'ee/l1_bandwidth_official.root')
-l1rate = l1_file.Get('otherrate')
+l1_his = l1_file.Get('otherrate') # CMS L1 rate vs Linst
 
-# PS column
-# Index,Name,Emergency,2.2E+34 ,2E+34, 1.7E+34, 1.5E+34, 1.3E+34, 1.1E+34, 9E+33, 6E+33
+# Di-electron trigger rate estimates from data
+# Contains parameterised L1 di-electron rate vs nPU
+ee_file = TFile(common_path+'ee/l1_bandwidth_official.root')
 
-# conversion
-# nPU = (instL+0.0011904)/0.0357388
-# instL = nPU*0.0357338 - 0.0011904
+# Normalise to integrated luminosity
+integrated_lumi = 86.4 # 12-hour fill @ 2E34 delivers 0.864/fb 
 
-switch_lumi = [(2.2, 2.0), (2.0, 1.7), (1.7, 1.5), (1.5, 1.3), (1.3, 1.1), (1.1, 0.9), (0.9, 0.6), (0.6, 0.1)]
-switch_npu = [56, 56, 48, 42, 36, 30, 25, 17]
+# L1 pT thresholds
+l1_ptrange = np.arange(4,11,0.5).tolist() 
 
-# HLT bandwidth from Sara's presentation
-# https://indico.cern.ch/event/1032638/contributions/4336416/attachments/2234250/3786463/2018BParking_forParkingRun3.pdf
+# List of L_inst values to consider
+# Linst = nPU*0.0357338 - 0.0011904
+switch_lumi = [(2.2, 2.0),
+               (2.0, 1.7), (1.7, 1.5), (1.5, 1.3), (1.3, 1.1), (1.1, 0.9), (0.9, 0.7),
+               (0.7, 0.47), (0.47, 0.24), (0.24, 0.06), (0.06, 0.)]
 
-max_bw_hlt = {
-    2.0:1515,
-    1.7:1740,
-    1.5:1929,
-    1.3:2163.5,
-    1.1:2463,
-    0.9:2929,
-    0.6:3791
-}
-    
+# List of nPU values to consider
+# nPU = (Linst+0.0011904)/0.0357388
+switch_npu = [62, # NEED TO UPDATE FOR HIGHEST LINST?
+              56, 48, 42, 36, 30, 25,
+              17, 17, 17, 17] # NEED TO UPDATE FOR LOWER LINST
 
+# Maximum L1 trigger bandwidth [Hz]
+l1_max = 95000.
 
-for graph, name in zip([graph_norm, graph_ll], ['norm', 'll']):
-#for graph, name in zip([graph_norm], ['norm']):
+# Rate (in Hz??) dedicated to new di-muon seeds in Run 3
+#dimuon = 0. # Redundant?
 
-    hists = []
- 
-    for il1, l1tol in enumerate([90000,95000]):
+# Rate (in kHz !!) dedicated to single-muon seed in Run 3
+single_muon = 5.
 
+# Determine correction to L1 rate for total CMS menu
+# i.e. ensure rate does not exceed l1_max @ 2E34 (i.e. remove any overspend)
+idx_2e34 = 1
+l1_rate_2e34 = l1_his.Eval(switch_lumi[idx_2e34][0])
+l1_rate_corr = max(0.,l1_rate_2e34-l1_max) # correct overspend only
 
-        h_integral = TGraph()
-        h_integral.SetName('n_l1tol' + str(l1tol) + '_' +  name)
-        h_integral.SetTitle('L1 max = ' + str(int(l1tol*0.001)) + ' kHz')
-        h_integral.SetLineColor(il1+1)
-        h_integral.SetMarkerSize(0)
-        h_integral.SetLineWidth(3)
+idx_1p7e34 = 2
+l1_rate_1p7e34 = l1_his.Eval(switch_lumi[idx_1p7e34][0])
+l1_rate_1p7e34 -= l1_rate_corr
 
+# List of peak L_inst (upper bounds from switch_lumi, list of 2-tuples ...)
+peak_lumis = [ h for (h,l) in switch_lumi ]
 
-#        if il1==1:
-#            h_prompt_integral = TGraph()
-#            h_prompt_integral.SetName('n_prompt_l1tol' + str(l1tol) + '_' + name)
-#            h_prompt_integral.SetTitle('Prompt: 10 GeV (5kHz @ L1), 100Hz @ HLT')
-#            h_prompt_integral.SetLineColor(4)
-#            h_prompt_integral.SetMarkerSize(0)
-#            h_prompt_integral.SetLineWidth(3)
+# L1 prescales for entire CMS menu (options 1 and 2)
+l1_rate_prescale = [1.94,
+                    1.94, 1.57, 1.32, 1.09, 1., 1.,
+                    1., 1., 1., 1.]
+#l1_rate_prescale = [5.]*len(peak_lumis) # Option 1
+l1_rate_prescale = [1.94,                # Option 2
+                    1.94, 1.57, 1.32, 1.09, 1., 1.,
+                    1., 1., 1., 1.]
+l1_rate_prescale_map = dict(zip(peak_lumis,l1_rate_prescale)) # Not applied by default - check below !!
 
+# This is the desired L1 pT threshold above which triggers are prescaled
+pt_max = 6.0
 
-        total = 0
-#        total_prompt = 0
-        total_lumi = 0
-        idx_total = 0
-#        idx_total_prompt = 0
+# List of tuples recorded for later analysis
+summary = []
 
+# Create luminosity profiles ...
+output='root/lumiprof.root'
+createLumiProfiles(output,synthetic=True)
+file_profile = TFile(output)
+
+# Get the relevant luminosity profiles
+profiles = [
+# FALLING
+    #file_profile.Get('falling_from_1p8e34_original'),
+    #file_profile.Get('falling_from_1p8e34'),
+    #file_profile.Get('falling_from_0p9e34'),
+# LUMI-LEVELLED
+    file_profile.Get('levelled_at_2p0e34'),
+    file_profile.Get('levelled_at_1p7e34'),
+    file_profile.Get('levelled_at_1p5e34'),
+    file_profile.Get('levelled_at_1p3e34'),
+    file_profile.Get('levelled_at_1p1e34'),
+    file_profile.Get('levelled_at_0p9e34'),
+    file_profile.Get('levelled_at_0p7e34'),
+    file_profile.Get('levelled_at_0p4e34'),
+    file_profile.Get('levelled_at_0p2e34'),
+]
+
+# Corrections to HLT rates - obsolete?
+corrs_dict = {}
+if options.corrected:
+    for npu in [56, 48, 42, 36, 30, 25, 17]:
+        filename = common_path+'rates/corrections_' + str(npu) + '.json'
+        infile = open(filename,'r')
+        dct = json.load(infile)
+        corrs_dict[npu] = dct
+        infile.close()
+
+################################################################################
+# Process the files ...
+
+# Iterate through the different luminosity profiles
+for idx,profile in enumerate(profiles):
+
+    name = profile.GetName()
+    print()
+    print("name:",name)
+
+    # Graph for spare capacity
+    gspare = TGraph()
+    gspare.SetName('spare')
+    gspare.SetTitle('L1 spare')
+    gspare.SetMarkerSize(0)
+    gspare.SetMarkerColor(kRed+1)
+    gspare.SetLineStyle(1)
+    gspare.SetLineColor(kRed+1)
+    gspare.SetLineWidth(3)
+
+    # List of graphs (one graph per dedicated rate allocation)
+    graphs = []
+
+    # Dedicated L1 rate allocation
+    allocations = [0,5000,10000,20000,90000][1:2] # Just 5k for now ...
+
+    # Iterate through different rate allocations
+    for style,allocation in enumerate(allocations):
+
+        # Graph for given rate allocation
+        graph = TGraph()
+        graph.SetName('name'+'_allocation_' + str(allocation))
+        graph.SetTitle(str(int(allocation/100.)/10.))
+        graph.SetMarkerSize(0)
+        graph.SetMarkerColor(kBlue+2)
+        graph.SetLineStyle(1)
+        graph.SetLineColor(kBlue+len(allocations)-style)
+        graph.SetLineWidth(style+1)
+
+        # Init for graph showing spare capacity
+        if style==0: gspare.SetPoint(0, 0., 0.)
+
+        # List to record various variables related to estimates
+        switches = []
+
+        # Counters
+        ls_cntr = 0     # lumi section
+        total_lumi = 0  # L_int
+        total_count = 0 # Estimated candidates
+
+        # Loop through "luminosity profile" graph
         old_lumi = -1
         time_elapsed = 0.
-        for ii in range(graph.GetN()):
+        for ii in range(profile.GetN()):
+            ls_cntr += 1
 
-            if ii==0: continue
+            # Get L_inst from profile
+            Linst = max(profile.GetPointY(ii), 1.e-9)
 
-            instL = max(graph.GetPointY(ii), 0.1)
-            time_duration = graph.GetPointX(ii) - graph.GetPointX(ii-1)
-            time_elapsed += time_duration
-            total_lumi += instL*10*time_duration
+            # Time interval (since last PointX, i.e. 1 LS = 23 secs) and total elapsed
+            time_interval = profile.GetPointX(ii) - profile.GetPointX(ii-1)
+            time_elapsed += time_interval
+
+            # Count L_int
+            total_lumi += Linst * 1.e-5 * time_interval # L_inst units: 1E-5 Hz/pb
             
-            # check which luminosity it is ... 
-
+            # Check which luminosity it is ... 
             which_lumi = -1
             which_npu = -1
-
             for index, sl in enumerate(switch_lumi):
-
-                if sl[1] <= instL and instL <= sl[0]:
-                    switch = True
-                    which_lumi = sl[0]
-                    which_npu = switch_npu[index]
+                if sl[1] < Linst and Linst <= sl[0]: # Is L_inst within upper and lower bounds
+                    which_lumi = sl[0]            # If yes, store L_inst
+                    which_npu = switch_npu[index] # If yes, store nPU
                     break
-
             if which_lumi==-1: 
-                print('WARNING!!: no corresponding lumis!!!',"instL",instL)
+                print('   WARNING!!: no corresponding lumis!!!',"Linst",Linst)
                 continue
 
-            switch = True if which_lumi != old_lumi else False
+            # Check if the "L_inst column" has changed 
+            switch = True if ( ( which_lumi != old_lumi ) or 
+                               ( ii == profile.GetN()-1 ) ) else False
             old_lumi = which_lumi
 
-            parking_bw = l1tol - l1rate.Eval(which_lumi)
+            # Evaluate and correct L1 rate for CMS menu based on peak L_inst
+            l1_rate = l1_his.Eval(which_lumi)
+            l1_rate -= l1_rate_corr # remove any overspend @ 2E34 (i.e. "translate down")
+            l1_rate = hackRate(l1_rate,which_lumi) # <<< HACK HACK HACK
 
-            #@@print('L=', instL, ', which lumi=', which_lumi, '(npu = ', which_npu, '), l1 rate =', l1rate.Eval(which_lumi), ', l1 b/w =', parking_bw)
+            # APPLY PRESCALE FOR L1 DI-ELE MENU IF USING PRESCALE-ADJUSTED APPROACH!!
+            #l1_rate /= l1_rate_prescale_map.get(which_lumi,1.) 
 
-            #hlt_file = TFile(common_path+'ee/roc_hlt_pu' + str(which_npu) + '.root')
-            hlt_file = TFile('root/roc_hlt_pu' + str(which_npu) + '.root')
+            # Determine L1 spare capacity 
+            spare = l1_max - l1_rate # APPLY CMS-WIDE PRESCALE HERE (IF REQUIRED)!
 
+            # HACK TO ACCOUNT FOR SINGLE MUON RATE (NORMALISED TO 5 KHZ)
+            mu_rate = single_muon * 1.e3 * l1_rate/l1_rate_1p7e34 if which_lumi < idx_1p7e34 else 0.
 
-            # determine L1 threshold ... 
-            which_l1pt = 10.
+            # Scale (i.e. "decay") di-electron rate allocation according to L_inst
+            alloc = allocation*(l1_rate/(l1_rate_2e34-l1_rate_corr)) # allocation scaled down by lumi
+
+            # Add spare capacity to graph (only for first rate allocation in list)
+            if style==0: gspare.SetPoint(ls_cntr, profile.GetPointX(ii), spare)
+
+            # Determine rate of L1 di-electron trigger for given nPU
+            which_l1pt = l1_ptrange[-1] 
             flag_park = False
             l1_ee_rate = None
-            
+            prescale = 1.
             for pt in l1_ptrange:
-                
-#                rate_ = l1_file.Get('doubleE' + str(pt) + ', dR < ' + str(drdict[pt]) + '0')
-                rate_ = l1_file_official.Get('L1_DoubleEG' + str(pt).replace('.','p').replace('p0','') + 'er1p22_dR_' + str(drdict[pt]).replace('.','p'))
-#                rate_ = l1_file_official.Get('doubleE' + str(pt) + ', dR < ' + str(drdict[pt]) + '0')
+                histo_ee_rate = ee_file.Get('L1_DoubleEG'+
+                                            str(pt).replace('.','p').replace('p0','')+
+                                            'er1p22_dR_' + str(dr_dict[pt]).replace('.','p'))
+                ee_rate = histo_ee_rate.Eval(which_npu)*1000
+                ee_rate = hackRate(ee_rate,which_lumi) # <<< HACK HACK HACK
 
-                rate_ = rate_.Eval(which_npu)*1000
-
-                if rate_ <= parking_bw:
+                # Check if the L1 di-ele rate satisfies the dedicate rate allocation or spare capacity
+                l1_ok = ee_rate < (alloc+1.e-6) or ee_rate < (alloc+spare-mu_rate+1.e-6) # spare + epsilon
+                if l1_ok:
                     which_l1pt = pt
                     flag_park = True
-                    l1_ee_rate = rate_
+                    l1_ee_rate = ee_rate
                     break
-
-
-
-            
-
-#            roc = hlt_file.Get('inv_pt' + str(which_l1pt).replace('.','p'))
-
-###            if il1==1:
-###                roc = hlt_file.Get('inv_pt10p0')
-###
-###                eff = -1.
-###
-###                for ip in range(roc.GetN()):
-###                    if roc.GetPointX(ip) < prompt_hlt_bw:
-###                        eff = roc.GetPointY(ip)
-###                        break
-###
-###
-####                print('\t prompt: HLT eff. =', eff, 'max b/w=', prompt_hlt_bw)
-###                if eff==-1:
-###                    print('WARNING!!: this cannot happen!')
-###
-###
-###
-###                n_prompt = instL*10.*fB*Sigma_B*pow(10.,-3)*Br_kee*eff*time_duration
-###                total_prompt += n_prompt
-###                h_prompt_integral.SetPoint(idx_total_prompt,  graph.GetPointX(ii), total_prompt)
-###
-###                idx_total_prompt += 1
-
-
-
-            ########
-
-            if not flag_park: 
-                #@@print('\t L1 not available')
+            if not flag_park:
+                #print('\t L1 not available')
                 continue
 
-            #@@print('\t which_l1pt=', which_l1pt, 'with l1 ee rate = ', l1_ee_rate)
+            # If using prescale-adjusted method, OVERRIDE above settings ...
+            if options.prescaled and which_l1pt > pt_max : # ... only if above pt_max
 
+                # Old settings
+                which_l1pt_ = which_l1pt
+                flag_park_ = flag_park
+                l1_ee_rate_ = l1_ee_rate
+                prescale_ = prescale
 
-#                print('check = rep_l1pt' + str(which_l1pt).replace('.','p') + '_hltpt' + str(which_l1pt - 1).replace('.','p'))
+                # New settings (reset)
+                which_l1pt = l1_ptrange[-1] 
+                flag_park = False
+                l1_ee_rate = None
+                prescale = 1.
 
-#            roc_hlt = hlt_file.Get('rep_l1pt' + str(which_l1pt).replace('.','p') + '_hltpt' + str(which_l1pt - 1).replace('.','p'))
-#            eff_hlt = rochlt.GetPointX(0)
-#            roc_hlt = hlt_file.Get('inv_pt' + str(which_pt_trigger).replace('.','p'))
-            roc = hlt_file.Get('inv_pt' + str(which_l1pt).replace('.','p'))
-            eff_hlt = -1
-#
-#         
-            for ip in range(roc.GetN()):
-                if roc.GetPointX(ip) < max_bw_hlt[which_lumi]:
-                    eff_hlt = roc.GetPointY(ip)
-                    break
-  
-            #@@print('\t parking: HLT eff. =', eff_hlt, 'max b/w=', max_bw_hlt[which_lumi])
+                # Determine rate of L1 di-electron trigger for given nPU
+                histo_ee_rate = ee_file.Get('L1_DoubleEG'+
+                                            str(pt_max).replace('.','p').replace('p0','')+
+                                            'er1p22_dR_' + str(dr_dict[pt_max]).replace('.','p'))
+                ee_rate = histo_ee_rate.Eval(which_npu)*1000
+                ee_rate = hackRate(ee_rate,which_lumi) # <<< HACK HACK HACK
 
-            if eff_hlt==-1:
-                print('!!!!!! This cannot happen !!!!')
-                
+                # Determine prescale to apply
+                l1_rate_max = max(alloc,alloc+spare-mu_rate)-1.e-6 # max allowed? (minus epsilon)
+                prescale = ee_rate/l1_rate_max if l1_rate_max > 0. else 1.
+                prescale = max(prescale,1.) # Ensure prescale >= 1.
+                ee_rate = ee_rate / prescale # Apply prescale
 
-            n = instL*10.*fB*Sigma_B*pow(10.,-3)*Br_kee*eff_hlt*time_duration
-   
-            total += n
+                # Check if the L1 di-ele rate satisfies the dedicate rate allocation or spare capacity
+                l1_ok = ee_rate < (alloc+1.e-6) or ee_rate < (alloc+spare-mu_rate+1.e-6) # spare + epsilon
+                if l1_ok:
+                    which_l1pt = pt_max
+                    flag_park = True
+                    l1_ee_rate = ee_rate
+                if not flag_park: 
+                    #print('\t L1 not available')
+                    continue
 
-            h_integral.SetPoint(idx_total, graph.GetPointX(ii), total)
-            idx_total += 1
+            # Determine HLT threshold ...
+            hlt_file = TFile(common_path+'ee/roc_hlt_pu' + str(which_npu) + '.root')
+            hlt_roc = hlt_file.Get('inv_pt' + str(which_l1pt).replace('.','p'))
+            hlt_n = hlt_roc.GetN()
 
+            if options.limit:
+
+                # Extract corrections to rates from JSON
+
+                hlt_max = 300. #max_bw_hlt[peak_lumi] # <-- Limit to 300 Hz for prompt reco
+                hlt_ok = True
+                hlt_rate = -1
+                hlt_eff = -1
+                which_hltpt = -1
+                for kk in range(hlt_n):
+                    ip = kk#hlt_n - kk - 1
+                    # print("test",kk,ip,hlt_pts[ip],hlt_roc.GetPointX(ip),hlt_max,hlt_roc.GetPointY(ip))
+                    hlt_rate = hlt_roc.GetPointX(ip) / prescale # Apply prescale
+                    hlt_eff = hlt_roc.GetPointY(ip) / prescale # Apply prescale
+                    which_hltpt = np.arange(4, 11, 0.5).tolist()[ip]
+                    if options.corrected:
+                        l1ptstr = str(which_l1pt)
+                        hltptstr = str(which_hltpt)
+                        if which_npu in corrs_dict.keys() and \
+                                l1ptstr in corrs_dict[which_npu].keys() and \
+                                hltptstr in corrs_dict[which_npu][l1ptstr].keys():
+                            corr = corrs_dict[which_npu][l1ptstr][hltptstr]
+                            if corr is not None: hlt_rate *= corr
+                            else: print("null value",which_npu,l1ptstr,hltptstr)
+                        else: print("unknown thresholds",which_npu,l1ptstr,hltptstr)
+                    if hlt_rate < hlt_max:
+                        break
+                if hlt_eff == -1: hlt_ok = False #print('!!!! This cannot happen !!!!')
+
+            else:
+
+                # Extract HLT pT, rate, and efficiency
+
+                hlt_rate = -1
+                hlt_eff = -1
+                which_hltpt = hlt_threshold_dict.get(which_l1pt,4.0)
+                hltpt_list = np.arange(4, 11, 0.5).tolist()
+                index = hltpt_list.index(which_hltpt)
+                if index < hlt_roc.GetN():
+                    hlt_rate = hlt_roc.GetPointX(index) / prescale # Apply prescale
+                    hlt_eff = hlt_roc.GetPointY(index) / prescale # Apply prescale
+                    if options.corrected:
+                        l1ptstr = str(which_l1pt)
+                        hltptstr = str(which_hltpt)
+                        if which_npu in corrs_dict.keys() and \
+                                l1ptstr in corrs_dict[which_npu].keys() and \
+                                hltptstr in  corrs_dict[which_npu][l1ptstr].keys():
+                            corr = corrs_dict[which_npu][l1ptstr][hltptstr]
+                            if corr is not None: hlt_rate *= corr
+                            else: print("null value",which_npu,l1ptstr,hltptstr)
+                        else: print("unknown thresholds",which_npu,l1ptstr,hltptstr)
+                else: print("cannot find hltpt")
+
+            # Determine candidates per time interval and increment counter
+            count = Linst * 1.e-5 * fB * Sigma_B * Br_kee * hlt_eff * time_interval
+            total_count += count
+            graph.SetPoint(ls_cntr, profile.GetPointX(ii), total_count)
+            
+            # Store various metrics for later analysis
             if switch:
+                switches.append((time_elapsed,
+                                 which_l1pt,
+                                 l1_ee_rate,
+                                 spare,
+                                 which_lumi,
+                                 total_lumi,
+                                 total_count))
                 print(
-                    " ".join(["ii:",str(ii),
-                    "dt:",str(time_duration),
-                    "time:",str(time_elapsed),
-                    "Peak:",str(which_lumi),
-                    "Linst:",str("{:.3f}".format(instL)),
-                    "spare:",str("{:.0f}".format(parking_bw)),
-                    "pT:",str(which_l1pt),
-                    "rate:",str("{:.0f}".format(l1_ee_rate)),
-                    "Eff:",str("{:.6f}".format(eff_hlt)),
-                    "dN:",str("{:.4f}".format(n)),
-                    "N:",str("{:.4f}".format(total))])
-                )
-
-#                print(idx_total, t1, total)
-
-
-        print(name, '--> l1 total rate = ', l1tol, 'total lumi = ', total_lumi)
+                    " ".join(["ii:",str("{:5.0f}".format(ii)),
+                              "time:",str("{:5.0f}".format(time_elapsed)),
+                              "Peak:",str("{:4.2f}".format(which_lumi)),
+                              "Linst:",str("{:.3f}".format(Linst)),
+                              "Lint:",str("{:.3f}".format(total_lumi)),
+                              "alloc:",str("{:5.0f}".format(alloc)),
+                              "spare:",str("{:5.0f}".format(spare)),
+                              "pT:",str("{:4.1f}".format(which_l1pt)),
+                              "L1 rate:",str("{:5.0f}".format(l1_ee_rate)),
+                              "mu rate:",str("{:5.0f}".format(mu_rate)),
+                              "HLT rate:",str("{:5.0f}".format(hlt_rate)),
+                              "HLT eff:",str("{:.6f}".format(hlt_eff)),
+                              "N:",str("{:6.3f}".format(total_count)),
+                              str("prescale: {:5.1f}".format(prescale) if options.prescaled else ""),
+                          ]))
  
-        factor = integrated_lumi/(total_lumi*pow(10.,-6))
+        graphs.append(copy.deepcopy(graph))
 
-        totalt = graph.GetPointX(graph.GetN()-1)
+        # Record peak lumis and L1 pTs
+        peak_lumis = [ peak_lumi for _,_,_,_,peak_lumi,_,_ in switches ][:-1]
+        l1pts = [ l1pt for _,l1pt,_,_,_,_,_ in switches ][:-1]
 
-        print('factor = ', integrated_lumi, total_lumi*pow(10.,-6), factor)
+        # Record time spent at each ...
+        start_t = [ time_elapsed for time_elapsed,_,_,_,_,_,_ in switches ]
+        end_t = start_t[1:]
+        diff_t = [ e-s for e,s in zip(end_t,start_t) ] 
 
-        print('# of Total Kee events =', total, 'with time duration', totalt, 'sec')
-        print('Assuming ' + str(integrated_lumi) + '/fb of data, we will get', total*factor, 'events')
-       
-#        print('# of prompt Kee events =', total_prompt, 'with time duration', totalt, 'sec')
-#        print('Assuming ' + str(integrated_lumi) + '/fb of data, we will get ', total_prompt*factor, 'events')
-        
-        print('total lumi = ', total_lumi, 'nb^-1')
-        
-        hists.append(copy.deepcopy(h_integral))
-#        if il1 == 1: hists.append(copy.deepcopy(h_prompt_integral))
-        
+        # Record lumis spent at each ...
+        start_L = [ total_lumi for _,_,_,_,_,total_lumi,_ in switches ]
+        end_L = start_L[1:]
+        diff_L = [ e-s for e,s in zip(end_L,start_L) ] 
 
-        ##### drawing ... 
+        # Record counts accumulated at each ...
+        start_C = [ total_count for _,_,_,_,_,_,total_count in switches ]
+        end_C = start_C[1:]
+        diff_C = [ e-s for e,s in zip(end_C,start_C) ] 
 
+        # Dict of peak_lumis:[diff_t,diff_L,diff_C]
+        peaks = {}
+        for pL,dt,dL,dC in zip(peak_lumis,diff_t,diff_L,diff_C) :
+            if pL not in peaks.keys() : peaks[pL] = [0.,0.,0.]
+            peaks[pL][0] += dt
+            peaks[pL][1] += dL
+            peaks[pL][2] += dC
 
-#    import pdb; pdb.set_trace()
-    canvas = TCanvas('can_' +  name)
-    canvas.SetGridx()
-    canvas.SetGridy()
-    
-    leg = TLegend(0.2, 0.68,0.5,0.86)
-    
-    applyLegendSettings(leg)
-    leg.SetTextSize(0.03)
-    
-    ymax = max([hist.GetMaximum() for hist in hists])
+        # Dict of pt_thresholds:[diff_t,diff_L,diff_C]
+        thresholds = {}
+        for pt,dt,dL,dC in zip(l1pts,diff_t,diff_L,diff_C) :
+            if pt not in thresholds.keys() : thresholds[pt] = [0.,0.,0.]
+            thresholds[pt][0] += dt
+            thresholds[pt][1] += dL
+            thresholds[pt][2] += dC
 
-    frame = TH2F('frame_' + name, 'frame_' + name, graph.GetN(), 0, totalt, 100,0,10.)
-    frame.GetXaxis().SetTitle('Time (s)')
-#    frame.GetYaxis().SetTitle('Instantaneous Luminosity (E34)')
-    frame.GetYaxis().SetTitle('Cumulative # of Kee events')
-    frame.Draw()
+        print("SUMMARY:") 
+        print('Lumi profile name:       ', name) 
+        print('L1 total rate:           ', l1_max)
+        print('Di-ele allocation:       ', allocation)
+        total_time = profile.GetPointX(profile.GetN()-1)
+        print('Time duration            ', total_time, 's')
+        print('Total lumi:              ', total_lumi,"fb^-1")
+        print('Total # or Kee events:   ', total_count)
+        factor = integrated_lumi/(total_lumi)
+        print('Target lumi:             ', integrated_lumi)
+        print('Luminosity factor:       ', factor)
+        print('Expected # of Kee events:', total_count*factor)
 
-    graph.SetLineColor(kGray)
-    graph.SetLineWidth(3)
-    graph.SetMarkerSize(0)
-    graph.Draw('same')
+        # Currently append for each allocation
+        summary.append((name,allocation,total_lumi,total_count,peaks,thresholds))
 
+    # First, lumi profile (only), then add estimates
+    for only_profile in [True,False]:
 
-    for ii, hist in enumerate(hists):
+        # Margins
+        gStyle.SetPadTopMargin(0.08)
+        gStyle.SetPadLeftMargin(0.14)
+        if only_profile: gStyle.SetPadRightMargin(0.03)
+        else: gStyle.SetPadRightMargin(0.26) # Extra space for multiple axes
 
-#        hist.SetMaximum(4)
-#        hist.SetLineColor(ii+2)
-#        hist.SetLineWidth(3)
-#        hist.SetMarkerColor(ii+1)
-#        hist.SetMarkerSize(1)
+        # Create canvas
+        canvas = TCanvas('canvas_' +  name)
+        canvas.SetGridx()
+        canvas.SetGridy()
+        gPad.SetTicks(1,0) # No tick marks on RHS
 
-        hist.Draw('lsame')
+        # Create frame for lumi profile
+        ymax = 2.5 # Maximum for y-axis (Linst)
+        frame = TH2F('frame_'+name, 'frame_'+name, 
+                     profile.GetN(), 0, total_time, # time axis
+                     100, 0, ymax ) # counts axis
+        frame.GetXaxis().SetTitle('Time [s]')
+        frame.GetYaxis().SetTitle('L_{inst} [10^{34} Hz/cm^{2}]')
+        frame.SetTitleOffset(1.2)
+        frame.Draw()
 
-        leg.AddEntry(hist, hist.GetTitle(), 'l')
+        # Draw lumi profile
+        profile.SetLineColor(kBlack)
+        profile.SetLineWidth(3)
+        profile.SetMarkerSize(0)
+        profile.Draw('same')
+        canvas.Update()
 
+        # Create legend
+        t = TLatex()
+        t.SetTextAlign(11)
+        t.SetTextSize(0.035)
+        if not only_profile: t.DrawLatexNDC(0.47,0.87,"Allocation [kHz]")
+        upper = 0.86
+        lower = upper-len(graphs)*0.04
+        leg = TLegend(0.45,lower,0.7,upper)
+        applyLegendSettings(leg)
+        leg.SetTextSize(0.035)
+                
+        # Draw graphs and right-hand axes
+        if not only_profile:
 
+            # Spare capacity
+            right_max = l1_max * ymax / 2.0
+            scale = gPad.GetUymax()/right_max
+            scaleGraph(gspare,scale)
+            gspare.Draw("same")
+            xshift = (gPad.GetUxmax()-gPad.GetUxmin())*0.25
+            axis2 = TGaxis(gPad.GetUxmax()+xshift,
+                           gPad.GetUymin(),
+                           gPad.GetUxmax()+xshift,
+                           gPad.GetUymax(),
+                           0,right_max,510,"+L")
+            axis2.SetLineColor(kRed+1)
+            axis2.SetLabelColor(kRed+1)
+            axis2.SetTitleOffset(1.4)
+            axis2.SetTitle('Spare L1 trigger capacity [Hz]')
+            axis2.SetTitleColor(kRed+1)
+            axis2.Draw()
 
-#    prompt.SetLineColor(4)
-#    prompt.SetLineWidth(2)
-#    prompt.Draw('same')
+            # Cumu candidates
+            right_max = 12.5
+            scale = gPad.GetUymax()/right_max
+            for ii, graph in enumerate(graphs[::-1]): # in reverse order
+                scaleGraph(graph,scale)
+                graph.Draw('lsame')
+                leg.AddEntry(graph, graph.GetTitle(), 'l')
+            axis1 = TGaxis(gPad.GetUxmax(),
+                           gPad.GetUymin(),
+                           gPad.GetUxmax(),
+                           gPad.GetUymax(),
+                           0,right_max,510,"+L")
+            axis1.SetLineColor(kBlue+2)
+            axis1.SetLabelColor(kBlue+2)
+            axis1.SetTitleOffset(1.2)
+            axis1.SetTitle('Cumulative number of Kee candidates')
+            axis1.SetTitleColor(kBlue+2)
+            axis1.Draw()
 
-    if name == 'norm':
-        leg.AddEntry(graph, 'Fill7321 (0.54/fb)', 'l')
-    else:
-        leg.AddEntry(graph, 'Run-3 pseudo profile (0.72/fb)', 'l')
+        # Draw legend
+        if not only_profile: leg.Draw()
 
-#    leg.AddEntry(prompt, 'Prompt (5kHz at L1, 100Hz at HLT)', 'lep')
+        # Add CMS labels
+        l2=add_Private(text="#it{Private Work}",x=0.27)
+        l2.Draw("same")
+        l3=add_CMS(x=0.14)
+        l3.Draw("same")
+        l4=add_lumi(total_lumi,x=0.83 if only_profile else 0.6)
+        l4.Draw("same")
 
-    leg.Draw()
+        # Save canvas
+        canvas.Update()
+        filename = 'plots/'+name+'.pdf'
+        if not only_profile: filename = filename.replace("plots/","plots/estimates_for_")
+        canvas.SaveAs(filename)
+        del canvas
 
-    canvas.RedrawAxis();
+# Print summary
+for name,allocation,lumi,count,peaks,thresholds in summary:
+    print('Name:',"{:30s}".format(name),
+          'L1 alloc [Hz]:',"{:6.0f}".format(allocation),
+          'Lint [/fb] per fill:',"{:6.3f}".format(lumi),
+          'Counts, per fill:',"{:5.1f}".format(count),
+          ', per /fb:',"{:5.1f}".format(count/lumi),
+          ', per 25/fb:',"{:5.1f}".format(integrated_lumi*count/lumi)
+    )
 
-#    filename = 'plots/estimate.gif'
+# Tables for estimates
 
-#    if options.pseudo:
-#        filename = 'plots/estimate_pseudo.gif'
+dct = {}
+for name,allocation,lumi,count,peaks,thresholds in summary:
+    if name not in dct.keys() : dct[name] = {}
+    dct[name][allocation] = (lumi,count)
 
-    filename = 'plots/' + name + '.gif'
+print()
+print("Per fill (Lint/fill, Counts for each allocation):")
+for name,counts in reversed(dct.items()):
+    print(name," ",end="")
+    print("{:0.2f}".format(counts[allocations[0]][0])," ",end="")
+    for alloc in allocations: print("{:5.1f}".format(counts[alloc][1])," ",end="")
+    print()
 
-    l2=add_Preliminary()
-    l2.Draw("same")
-    l3=add_CMS()
-    l3.Draw("same")
-    
-    canvas.SaveAs(filename)
-    canvas.SaveAs(filename.replace('.gif', '.pdf'))
+nfills = {}
+#nfills['falling_from_1p8e34'] = 1
+nfills['levelled_at_0p2e34'] = 3
+nfills['levelled_at_0p4e34'] = 3
+nfills['levelled_at_0p7e34'] = 3
+nfills['levelled_at_0p9e34'] = 12
+nfills['levelled_at_1p1e34'] = 12
+nfills['levelled_at_1p3e34'] = 12
+nfills['levelled_at_1p5e34'] = 12
+nfills['levelled_at_1p7e34'] = 12
+nfills['levelled_at_2p0e34'] = 12
 
+print("All fills (Lint/fill, Nfills, Lint all fills, Counts for each allocation):")
+Lint_total = 0.
+total = [0.]*len(allocations)
+for name,counts in reversed(dct.items()):
+    print(name," ",end="")
+    Lint = counts[allocations[0]][0]
+    nfill = nfills.get(name,1.)
+    Lint_total += Lint*nfill
+    print("{:4.2f}".format(Lint)," ",end="")
+    print("{:2.0f}".format(nfill)," ",end="")
+    print("{:5.2f}".format(Lint*nfill)," ",end="")
+    for ialloc,alloc in enumerate(allocations): 
+        count = counts[alloc][1]
+        tot = count*nfill
+        print("{:6.1f}".format(tot)," ",end="")
+        total[ialloc] += tot
+    print()
+print(" "*29,"{:5.2f} ".format(Lint_total),"  ".join(["{:6.1f}".format(t) for t in total]))
 
+print()
+print("THE FOLLOWING ONLY WORKS WHEN RERUNNING FOR  EACH ALLOCATION IN TURN...!!!")
 
+dct2 = {}
+total_dt = 0.
+total_dL = 0.
+total_dC = 0.
+for name,_,_,_,peaks,_ in reversed(summary):
+    for peak_lumi,[dt,dL,dC] in peaks.items():
+        if peak_lumi not in dct2.keys() : dct2[peak_lumi] = [0.,0.,0.]
+        tot_dt = dt*nfills.get(name,1.)
+        dct2[peak_lumi][0] += tot_dt
+        total_dt += tot_dt
+        tot_dL = dL*nfills.get(name,1.)
+        dct2[peak_lumi][1] += tot_dL
+        total_dL += tot_dL
+        tot_dC = dC*nfills.get(name,1.)
+        dct2[peak_lumi][2] += tot_dC
+        total_dC += tot_dC
+print("Peak Linst, Duration [s], Lint [/fb], Counts, (%)") 
+for peak,[dt,dL,dC] in dct2.items():
+    print("{:4.1f} {:8.0f} {:4.2f} {:6.2f} ({:4.2f}) {:5.1f} ({:4.2f})".format(peak,
+                                                                               dt,dt/total_dt,
+                                                                               dL,dL/total_dL,
+                                                                               dC,dC/total_dC))
+print("Tot: {:8.0f}      {:6.2f}        {:5.1f}".format(total_dt,total_dL,total_dC))
 
-
-
-
-
-#        file2out = 'n_' + str(options.l1tol) + '.root'
-#
-#        if options.pseudo:
-#            file2out = 'n_' + str(options.l1tol) + '_pseudo.root'
-#
-#        nfile = TFile(file2out, 'recreate')
-#
-#        h_integral.Write()
-#        h_prompt_integral.Write()
-#        graph.Write()
-#        nfile.Write()
-#        nfile.Close()
+dct3 = {}
+total_dt = 0.
+total_dL = 0.
+total_dC = 0.
+for name,_,_,_,_,thresholds in reversed(summary):
+    for threshold,[dt,dL,dC] in thresholds.items():
+        if threshold not in dct3.keys() : dct3[threshold] = [0.,0.,0.]
+        tot_dt = dt*nfills.get(name,1.)
+        dct3[threshold][0] += tot_dt
+        total_dt += tot_dt
+        tot_dL = dL*nfills.get(name,1.)
+        dct3[threshold][1] += tot_dL
+        total_dL += tot_dL
+        tot_dC = dC*nfills.get(name,1.)
+        dct3[threshold][2] += tot_dC
+        total_dC += tot_dC
+print("pT threshold, Duration [s], Lint [/fb], Counts, (%)") 
+for threshold,[dt,dL,dC] in dct3.items():
+    print("{:4.1f} {:8.0f} {:4.2f} {:6.2f} ({:4.2f}) {:5.1f} ({:4.2f})".format(threshold,
+                                                                               dt,dt/total_dt,
+                                                                               dL,dL/total_dL,
+                                                                               dC,dC/total_dC))
+print("Tot: {:8.0f}      {:6.2f}        {:5.1f}".format(total_dt,total_dL,total_dC))

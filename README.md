@@ -78,6 +78,7 @@ Provides various menus:
 - "hybrid" menus using L1 prescales
 - menus paramterised vs NPU and Nbunches
 - menus paramterised vs NPU and Nbunches and using Run 3 observed rates (default)
+
 ... and various tables of useful metrics.
 ```
 python3 metrics.py 

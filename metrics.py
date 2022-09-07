@@ -929,17 +929,19 @@ def configurations(action):
     elif action == "print_prescaled_menu":
         # Print original menu and hybrid (i.e. prescaled) menu
         allocation = 5000.
+        print("THIS NEEDS SOME WORK ...")
         print("allocation:",allocation)
         print_tables_original(debug=False,
                               table="menu",
-                              l1_max=_l1_max,
+                              l1_max=_l1_max_2018,
                               hlt_max=-1.,
                               allocation=allocation)
-#        print_tables_original(debug=False,
-#                              table="menu_prescaled",
-#                              l1_max=l1_max,
-#                              hlt_max=-1.,
-#                              allocation=allocation)
+        print("THE PRESCALED TABLE BELOW NEEDS SOME WORK ...")
+        print_tables_original(debug=False,
+                              table="menu_prescaled",
+                              l1_max=_l1_max_2018,
+                              hlt_max=-1.,
+                              allocation=allocation)
         
     elif action == "print_original_menu_vs_nbunches":
         # Print "menu" for different nbunches 
@@ -996,7 +998,7 @@ if __name__ == "__main__":
         "print_original_menu_vs_nbunches", # Prints original menu vs number of bunches
         "print_tables_run3rates",          # Prints metric tables and menus using Run 3 observed L1 trigger rates
         "print_tables_run3rates_param",    # Prints metric tables and menus using parameterised Run 3 observed L1 trigger rates
-        ][0]
+        ][2]
 
     print("########## Configuration ##########") 
     print("Action:",action) 

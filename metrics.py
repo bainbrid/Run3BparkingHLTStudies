@@ -61,11 +61,11 @@ ee_file = TFile(common_path+'ee/l1_bandwidth_official.root')
 # Number of fills to consider 
 nfills = 100
 
-# Normalise to integrated luminosity
-integrated_lumi = 86.4 # 12-hour fill @ 2E34 delivers 0.864/fb 
+# Normalise to unit integrated luminosity
+integrated_lumi = 1.
 
 # L1 and HLT pT thresholds
-l1_pts = np.arange(4.,11.5,0.5).tolist()
+l1_pts = np.arange(4.,11.0,0.5).tolist()
 hlt_pts = np.arange(4.,11.0,0.5).tolist()
 
 # List of L_inst values to consider
@@ -295,8 +295,8 @@ def print_table(debug,value,l1_max=95000.,dimuon=0.,allocation=0.):
     # Special case: print "menu"
     if value == "menu" :
         Lint = integrated_lumi # defined above
-        print("Lint:", Lint)
-        print("Nfills:", nfills)
+        #print("Lint:", Lint)
+        #print("Nfills:", nfills)
         print("Linst   L1 pT   HLT pT    L1 rate HLT rate"
               "      AxE   L/fill   #/fill   #/Lint  AxE/kHz")  #/fills")
         for jj,lumi in enumerate(switch_lumi) :
@@ -328,10 +328,10 @@ def print_table(debug,value,l1_max=95000.,dimuon=0.,allocation=0.):
         (l1_pt_,hlt_pt_,ee_rate_,hlt_rate_,hlt_eff_,capacity_) = menu_dict[peak_lumi_]
 
         Lint = integrated_lumi # defined above
-        print("Lint:", Lint)
-        print("Nfills:", nfills)
+        #print("Lint:", Lint)
+        #print("Nfills:", nfills)
         print("Linst   L1 pT   HLT pT    L1 rate HLT rate"
-              "      AxE   L/fill   #/fill   #/Lint  AxE/kHz prescale")
+              "      AxE   L/fill   #/fill     #/fb  AxE/kHz prescale")
         for jj,(lumi,npu) in enumerate(zip(switch_lumi,switch_npu)) :
             peak_lumi = lumi[0]
             if peak_lumi not in menu_dict : 
@@ -388,7 +388,8 @@ if __name__ == "__main__":
         print_table(debug=False,value=value,l1_max=l1_max,dimuon=dimuon,allocation=0.) # Assume 0 kHz allocation here
 
     # Print "menu" for different allociations (and with/out prescales)
-    for allocation in [0.,5000.,10000.,20000.]: 
+    for allocation in [0.,5000.,10000.,20000.,90000]:
         print("allocation:",allocation)
         print_table(debug=False,value="menu",l1_max=l1_max,dimuon=dimuon,allocation=allocation)
+        print("Prescales based on trigger used @ 0.6E34...!")
         print_table(debug=False,value="menu_prescaled",l1_max=l1_max,dimuon=dimuon,allocation=allocation)

@@ -175,7 +175,7 @@ for idx,profile in enumerate(profiles):
     graphs = []
 
     # Dedicated L1 rate allocation
-    allocations = [0,5000,10000,20000][1:2] # Just 5k for now ...
+    allocations = [0,5000,10000,20000,90000][1:2] # Just 5k for now ...
 
     # Iterate through different rate allocations
     for style,allocation in enumerate(allocations):
@@ -575,6 +575,7 @@ for name,allocation,lumi,count,peaks,thresholds in summary:
     if name not in dct.keys() : dct[name] = {}
     dct[name][allocation] = (lumi,count)
 
+print()
 print("Per fill (Lint/fill, Counts for each allocation):")
 for name,counts in reversed(dct.items()):
     print(name," ",end="")
@@ -612,6 +613,9 @@ for name,counts in reversed(dct.items()):
         total[ialloc] += tot
     print()
 print(" "*29,"{:5.2f} ".format(Lint_total),"  ".join(["{:6.1f}".format(t) for t in total]))
+
+print()
+print("THE FOLLOWING ONLY WORKS WHEN RERUNNING FOR  EACH ALLOCATION IN TURN...!!!")
 
 dct2 = {}
 total_dt = 0.
@@ -660,5 +664,3 @@ for threshold,[dt,dL,dC] in dct3.items():
                                                                                dL,dL/total_dL,
                                                                                dC,dC/total_dC))
 print("Tot: {:8.0f}      {:6.2f}        {:5.1f}".format(total_dt,total_dL,total_dC))
-
-print("DOES IT WORK FOR MULTIPLE ALLOCATIONS!!!")

@@ -73,12 +73,17 @@ and create the ROOT files containing each ROC curve, to be later used in the nex
 
 # 5. Estimate number of Kee candidates
 
-Provides the menus and various tables of useful metrics:
+Provides various menus:
+- original menus in AN-21-160 v3
+- "hybrid" menus using L1 prescales
+- menus paramterised vs NPU and Nbunches
+- menus paramterised vs NPU and Nbunches and using Run 3 observed rates (default)
+... and various tables of useful metrics.
 ```
 python3 metrics.py 
 ```
 
 Provides estimates per LHC fill (based on a pseudo LHC luminosity profiles):
 ```
-python3 estimate2.py 
+python3 estimate.py 
 ```

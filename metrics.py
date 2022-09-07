@@ -970,15 +970,14 @@ def configurations(action):
                                nb_default=_nb_default)
 
     elif action == "print_tables_run3rates_param":
-        #for nbunches in [2740, 2640, 2544, 2400, 2160, 1922]:
-        for nbunches in [2740]:
+        for nbunches in [2740, 2640, 2544, 2400, 2160, 1922]:
             print("nbunches:",nbunches)
             print_tables_run3rates_param(debug=False,
                                          table="menu",
                                          #l1_pts=[4.5,5.5,6.0,6.5,7.0,8.0,10.5], #@@ temp!!
                                          #l1_pts=[6.0,6.5,7.0,8.0,8.5,10.5], #@@ temp!!
                                          #l1_pts=[6.],
-                                         l1_max=_l1_max,
+                                         l1_max=100000., # run for both 95k and 100k
                                          allocation=5000.,
                                          hlt_max=-1.,
                                          nbunches=nbunches,
@@ -998,7 +997,7 @@ if __name__ == "__main__":
         "print_original_menu_vs_nbunches", # Prints original menu vs number of bunches
         "print_tables_run3rates",          # Prints metric tables and menus using Run 3 observed L1 trigger rates
         "print_tables_run3rates_param",    # Prints metric tables and menus using parameterised Run 3 observed L1 trigger rates
-        ][2]
+        ][4]
 
     print("########## Configuration ##########") 
     print("Action:",action) 

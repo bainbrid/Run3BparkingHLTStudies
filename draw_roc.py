@@ -23,7 +23,7 @@ gStyle.SetOptStat(0)
 from optparse import OptionParser, OptionValueError
 usage = "usage: python runTauDisplay_BsTauTau.py"
 parser = OptionParser(usage)
-parser.add_option('-w', '--weight', action="store_true", default=False, dest='weight', help="weight by analysis eff")
+parser.add_option('-w', '--weight', action="store_true", default=True, dest='weight', help="weight by analysis eff")
 parser.add_option('-r', '--rates', action="store_true", default=False, dest='rates', help="write trigger rates to JSON")
 parser.add_option('-c', '--corrected', action="store_true", default=False, dest='corrected', help="apply trigger rates correction factor")
 (options, args) = parser.parse_args()

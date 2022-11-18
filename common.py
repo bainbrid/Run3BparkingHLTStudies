@@ -8,10 +8,11 @@ import os, copy
 from ROOT import TDatime, TFile, TGraph
 
 ################################################################################
-# Define comon path to input files (i.e. either EOS or local)
+# Define comon path to input files (i.e. either EOS via lxplus or local)
 
-local=False
-common_path='./root/' if local else '/eos/cms/store/group/phys_bphys/DiElectronX/RootFiles4Run3Parking/'
+lxplus=True
+common_path='./root/current/'
+if lxplus==True: common_path='/eos/cms/store/group/phys_bphys/DiElectronX/RootFiles4Run3Parking/current/'
 
 ################################################################################
 

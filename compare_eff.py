@@ -8,6 +8,11 @@ from array import array
 import numpy as np
 import itertools
 from common import common_path
+from common import l1_ptmin, l1_ptmax, l1_ptstep, l1_ptlist
+from common import hlt_ptmin, hlt_ptmax, hlt_ptstep, hlt_ptlist
+from common import working_points
+from common import timing
+import time
 
 gROOT.SetBatch(True)
 officialStyle(gStyle)
@@ -21,22 +26,30 @@ usage = "usage: python compare_eff.py"
 parser = OptionParser(usage)
 parser.add_option('-w', '--weight', action="store_true", default=False, dest='weight')
 parser.add_option('-p', '--plot', action="store_true", default=False, dest='plot')
+parser.add_option("-o", "--option", action="store", type="int", default=0, dest="option", help="option: 0 = original, 1 = same as 0, but reprocessed, 2 = trg with q2 req, 3 = use gen q2 eff map")
 (options, args) = parser.parse_args()
 
 # Analysis efficiency map
 eff_histo = None
+eff_histo2 = None
 if options.weight:
-    eff_file = TFile(common_path+'eff_maps/2022Jan19/eff.root')
-    eff_histo = eff_file.Get('tot16_pt1_vs_pt2_qsq_weighted')
+    if options.option == 0: # original
+        eff_file = TFile(common_path+'eff_maps/0_original/eff.root')
+        eff_histo = eff_file.Get('eff_pt1_vs_pt2_tot_weighted')
+    elif options.option == 1: # reprocessed
+        eff_file = TFile(common_path+'eff_maps/1_reproduced/eff.root')
+        eff_histo = eff_file.Get('eff_pt1_vs_pt2_tot_weighted')
+    else: # 2 or 3 ("trg with q2 req" or "use gen q2 eff map")
+        eff_file = TFile(common_path+'eff_maps/2_add_qsq_req/eff.root')
+        eff_histo = eff_file.Get('eff_pt1_vs_pt2_tot_weighted') # eff with reco q2 req. in numer
+        #eff_histo = eff_file.Get('eff_pt1_vs_pt2_tot_norecoqsq') # eff with no reco q2 req. in numer
+        if options.option == 3: # gen_q2_eff_map
+            eff_file2 = TFile(common_path+'eff_maps/1_reproduced/eff2.root')
+            eff_histo2 = eff_file2.Get('eff_pt1_vs_pt2_gen_qsq')
     print('Found analysis efficiencies!',eff_histo)
 
-#l1_ptrange = np.arange(5, 12, 1).tolist()
-l1_ptrange = np.arange(4, 11, 0.5).tolist()
-#hlt_ptrange = np.arange(4, 12, 1).tolist()
-hlt_ptrange = np.arange(4, 11, 0.5).tolist()
-
-#l1_ptrange = np.arange(5, 12, 0.5).tolist() 
-#hlt_ptrange = np.arange(4, 12, 0.5).tolist() 
+#l1_ptlist = np.arange(4, 11, 0.5).tolist()
+#hlt_ptlist = np.arange(4, 11, 0.5).tolist()
 
 colours = [1, 2, 4, 6, 8, 13, 15]
 styles = [1, 2, 4, 3, 5, 1, 1]
@@ -230,17 +243,18 @@ file = TFile(common_path+'ee/gen_for_efficiency_evaluation.root')
 tree = file.Get('tree')
 
 
-#h_e1 = TH2F('e1' , 'e1', len(l1_ptrange)-1, min(l1_ptrange), max(l1_ptrange), len(hlt_ptrange)-1, min(hlt_ptrange), max(hlt_ptrange))
+#h_e1 = TH2F('e1' , 'e1', len(l1_ptlist)-1, min(l1_ptlist), max(l1_ptlist), len(hlt_ptlist)-1, min(hlt_ptlist), max(hlt_ptlist))
 #
-#h_e2 = TH2F('e2' , 'e2', len(l1_ptrange)-1, min(l1_ptrange), max(l1_ptrange), len(hlt_ptrange)-1, min(hlt_ptrange), max(hlt_ptrange))
+#h_e2 = TH2F('e2' , 'e2', len(l1_ptlist)-1, min(l1_ptlist), max(l1_ptlist), len(hlt_ptlist)-1, min(hlt_ptlist), max(hlt_ptlist))
 #
-#h_e1e2 = TH2F('e1e2' , 'e1e2', len(l1_ptrange)-1, min(l1_ptrange), max(l1_ptrange), len(hlt_ptrange)-1, min(hlt_ptrange), max(hlt_ptrange))
+#h_e1e2 = TH2F('e1e2' , 'e1e2', len(l1_ptlist)-1, min(l1_ptlist), max(l1_ptlist), len(hlt_ptlist)-1, min(hlt_ptlist), max(hlt_ptlist))
 #
-#h_all = TH2F('all' , 'all', len(l1_ptrange)-1, min(l1_ptrange), max(l1_ptrange), len(hlt_ptrange)-1, min(hlt_ptrange), max(hlt_ptrange))
+#h_all = TH2F('all' , 'all', len(l1_ptlist)-1, min(l1_ptlist), max(l1_ptlist), len(hlt_ptlist)-1, min(hlt_ptlist), max(hlt_ptlist))
 
-h_gall = TH2F('gall' , 'gall', len(l1_ptrange)-1, min(l1_ptrange), max(l1_ptrange), len(hlt_ptrange)-1, min(hlt_ptrange), max(hlt_ptrange))
-
-#h_gall_mass = TH2F('gall_mass' , 'gall_mass', len(l1_ptrange)-1, min(l1_ptrange), max(l1_ptrange), len(hlt_ptrange)-1, min(hlt_ptrange), max(hlt_ptrange))
+l1_nbin = int((l1_ptmax - l1_ptmin) / l1_ptstep)
+hlt_nbin = int((hlt_ptmax - hlt_ptmin) / hlt_ptstep)
+h_gall = TH2F('gall' , 'gall', l1_nbin,l1_ptmin,l1_ptmax,hlt_nbin,hlt_ptmin,hlt_ptmax)
+#h_gall_mass = TH2F('gall_mass' , 'gall_mass', len(l1_ptlist)-1, min(l1_ptlist), max(l1_ptlist), len(hlt_ptlist)-1, min(hlt_ptlist), max(hlt_ptlist))
 
 
 #h_e1.GetXaxis().SetTitle('L1 di-electron X GeV')
@@ -265,21 +279,26 @@ def calcEff(tree, denstr, numstr):
     # Denominator
     den = tree.GetEntries(denstr)
     # Numerator
+    #gen_q2 = 'gen_mass > 1.05 && gen_mass < 2.5'
+    gen_q2 = 'gen_mass*gen_mass > 1.1 && gen_mass*gen_mass < 6.25' if options.option == 2 else "1"
     if not options.weight :
-        num = tree.GetEntries(numstr)
+        num = tree.GetEntries(numstr + " && " + gen_q2)
     else :
         gen_pt  = 'gen_e1_pt > 2.0 && gen_e2_pt > 2.0'
         gen_eta = 'abs(gen_e1_eta) < 1.2 && abs(gen_e2_eta) < 1.2'
         num = 0.
-        ybins = eff_histo.GetYaxis().GetNbins()
-        xbins = eff_histo.GetXaxis().GetNbins()
+        ybins = eff_histo.GetYaxis().GetNbins() #ybins = eff_histo2.GetYaxis().GetNbins()
+        xbins = eff_histo.GetXaxis().GetNbins() #xbins = eff_histo2.GetXaxis().GetNbins()
         cntr=0
+        unweighted=0
         for ybin in range(1,ybins+1):
             for xbin in range(1,xbins+1):
                 if xbin > ybin : continue
-                print("".join(["  ","#",str(cntr)," out of ",str(ybins*xbins/2.)]))
                 cntr+=1
-                eff = eff_histo.GetBinContent(xbin,ybin)
+                print("".join(["  ","Processing #",str(cntr)," out of ",str(sum([x+1 for x in range(xbins)]))," eff bins..."]),)
+                eff = eff_histo.GetBinContent(xbin,ybin) #eff = eff_histo.GetBinContent(min(xbin,6),min(ybin,6))
+                #print("eff",eff)
+                eff2 = eff_histo2.GetBinContent(xbin,ybin) if options.option == 3 else 1.
                 y_down = eff_histo.GetYaxis().GetBinLowEdge(ybin)
                 y_up = eff_histo.GetYaxis().GetBinLowEdge(ybin) + eff_histo.GetYaxis().GetBinWidth(ybin)
                 x_down = eff_histo.GetXaxis().GetBinLowEdge(xbin)
@@ -288,19 +307,36 @@ def calcEff(tree, denstr, numstr):
                 if ybin < ybins : gen_e1_pt += ' && ' + 'gen_e1_pt < ' + str(y_up)
                 gen_e2_pt = 'gen_e2_pt > ' + str(x_down)
                 if xbin < xbins : gen_e2_pt += ' && ' + 'gen_e2_pt < ' + str(x_up)
-                newgencut = ' && '.join([gen_e1_pt, gen_e2_pt, gen_pt, gen_eta])
+                newcuts = [gen_e1_pt, gen_e2_pt, gen_pt, gen_eta]
+                if options.option == 2: newcuts.append(gen_q2)
+                newgencut = ' && '.join(newcuts)
                 entry = float(tree.GetEntries(numstr + ' && ' + newgencut))
-                num += entry*eff
+                eff=1.
+                num += entry*eff*eff2
+                unweighted += entry
+                #print("   ybin",ybin,"xbin",xbin)
+                #print("   e1_pt_bin",y_down,"e2_pt_bin",x_down)
+                #print("   eff",eff,)
+                #print("   counts",entry)
+                #print("   unweighted",unweighted)
+                #print("   num",num)
+
     # Efficiency
     eff = float(num)/float(den)
+    #eff_unw = float(unweighted)/float(den)
+    #print("denom:",den,"unweighted:",unweighted,"weighted:",num,"eff(unw):",eff_unw,"eff:",eff)
     print(numstr, '(', num, ')', denstr, '(', den, ')', '---->', eff)
     return eff
 
 qcut = 'e1_hlt_pms2 < 10000 && e1_hlt_invEInvP < 0.2 && e1_hlt_trkDEtaSeed < 0.01 && e1_hlt_trkDPhi < 0.2 && e1_hlt_trkChi2 < 40 && e1_hlt_trkValidHits >= 5 && e1_hlt_trkNrLayerIT >= 2'
 
-for il1, l1_pt in enumerate(l1_ptrange):
-    for ihlt, hlt_pt in enumerate(hlt_ptrange):
-        print("".join(["#",str(il1*len(hlt_ptrange)+ihlt)," out of ",str(len(l1_ptrange)*len(hlt_ptrange))]))
+iloop = 0
+nloop = len(l1_ptlist)*len(hlt_ptlist) if working_points==False else len(l1_ptlist)
+start = time.time()
+for il1, l1_pt in enumerate(l1_ptlist):
+    for ihlt, hlt_pt in enumerate(hlt_ptlist):
+        if working_points==True and il1 != ihlt : continue
+        print("".join(["Processing #",str(iloop)," out of ",str(nloop)," triggers..."]))
 
         sel_inclusive = '1'
         sel_den = 'gen_e1_l1_dr < 0.2 && gen_e2_l1_dr < 0.2 && e1_l1_pt >= ' + str(l1_pt) + ' && e2_l1_pt >= ' + str(l1_pt) 
@@ -318,13 +354,17 @@ for il1, l1_pt in enumerate(l1_ptrange):
         
         sel_all_mass = '&&'.join([sel_den, match_e1, match_e2, sel_dr_mass, qcut, qcut.replace('e1', 'e2')])
 
+        xbin = h_gall.GetXaxis().FindBin(l1_pt+1.e-3)
+        ybin = h_gall.GetYaxis().FindBin(hlt_pt+1.e-3)
         #h_e1.SetBinContent(il1+1, ihlt+1, calcEff(tree, sel_den, sel_e1))
         #h_e2.SetBinContent(il1+1, ihlt+1, calcEff(tree, sel_den, sel_e2))
         #h_e1e2.SetBinContent(il1+1, ihlt+1, calcEff(tree, sel_den, sel_e1e2))
         #h_all.SetBinContent(il1+1, ihlt+1, calcEff(tree, sel_den, sel_all_mass))
-        h_gall.SetBinContent(il1+1, ihlt+1, calcEff(tree, sel_inclusive, sel_all_mass))
+        h_gall.SetBinContent(xbin, ybin, calcEff(tree, sel_inclusive, sel_all_mass))
         #h_gall_mass.SetBinContent(il1+1, ihlt+1, calcEff(tree, sel_inclusive, sel_all_mass))
 
+        timing(iloop,nloop,start,"loops")
+        iloop+=1
 
 ensureDir('root/')
 
@@ -349,7 +389,7 @@ filedict = {'sig_e1': {'file':file, 'sel':'gen_e1_l1_dr < 0.2 && gen_e2_l1_dr < 
 
 
 if options.plot:
-    ensureDir('plots/')
+    ensureDir(common_path+'plots/')
 
     for vkey, ivar in vardict.items():
 
@@ -380,5 +420,5 @@ if options.plot:
             ihist.Scale(1./ihist.GetSumOfWeights())
             ihist.SetMaximum(ihist.GetBinContent(ihist.GetMaximumBin())*1.2)
 
-        comparisonPlots(hists, titles, False, 'plots/' + vkey + '.pdf', False, False, True)
-        comparisonPlots(hists, titles, True, 'plots/' + vkey + '_log.pdf', False, False, True)
+        comparisonPlots(hists, titles, False, common_path+'plots/' + vkey + '.pdf', False, False, True)
+        comparisonPlots(hists, titles, True, common_path+'plots/' + vkey + '_log.pdf', False, False, True)

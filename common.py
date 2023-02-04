@@ -8,11 +8,31 @@ import os, copy
 from ROOT import TDatime, TFile, TGraph
 
 ################################################################################
-# Define comon path to input files (i.e. either EOS via lxplus or local)
+# Define common path to input files (i.e. either EOS via lxplus or local)
 
 lxplus=True
 common_path='./root/current/'
 if lxplus==True: common_path='/eos/cms/store/group/phys_bphys/DiElectronX/RootFiles4Run3Parking/current/'
+
+################################################################################
+# Define L1 and HLT thresholds to use
+
+l1_ptmin = 4.0
+l1_ptmax = 11.0
+l1_ptstep = 0.5
+l1_ptlist = np.arange(l1_ptmin, l1_ptmax+l1_ptstep, l1_ptstep).tolist()
+hlt_ptmin = 4.0
+hlt_ptmax = 10.0
+hlt_ptstep = 0.5
+hlt_ptlist = np.arange(hlt_ptmin, hlt_ptmax+hlt_ptstep, hlt_ptstep).tolist() 
+working_points=True
+if working_points==True:
+    #l1_ptlist  = [4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5]
+    #hlt_ptlist = [4.0, 4.0, 4.0, 4.0, 4.0, 4.5, 5.0, 5.0, 5.0, 5.5, 6.0, 6.5,  6.5,  6.5]
+    #l1_ptlist  = [10.5]
+    #hlt_ptlist = [ 6.5]
+    l1_ptlist  = [4.0, 8.0, 10.5]
+    hlt_ptlist = [4.0, 5.0,  6.5]
 
 ################################################################################
 
@@ -148,7 +168,7 @@ def extractLumiProfiles(original=False,max_duration=12*3600) :
 # Can be based on a real but modified (e.g. smoothed) lumi profile (from above) ...
 # ... or a "synthetic" profile based on exponential parameterisation of real profile
 
-def createLumiProfiles(output='root/lumiprof.root',backup=False,synthetic=True) :
+def createLumiProfiles(output=common_path+'lumiprof.root',backup=False,synthetic=True) :
 
     if os.path.exists(output): 
         print("Warning! File already exists!")
@@ -311,3 +331,16 @@ def RunningMedian(seq, M):
         insort(s, item)            # insert newest such that new sort is not required        
         medians.append(median())  
     return medians
+
+def timing( i, n, start, string ):
+    processed = i+1
+    remaining = n-processed
+    import time
+    import datetime
+    now = time.time()
+    elapsed_seconds = now - start
+    time_per_loop = elapsed_seconds / processed
+    predicted_duration = time_per_loop * remaining
+    print("Processed",i,"out of",n,string,".")
+    print(" Time elapsed [hms]:  ",datetime.timedelta(seconds=elapsed_seconds))
+    print(" Time remaining [hms]:",datetime.timedelta(seconds=predicted_duration))

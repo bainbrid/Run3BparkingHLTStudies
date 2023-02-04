@@ -3,17 +3,21 @@ from ROOT import TFile, TH1F, TH2F, TTree, gROOT, gStyle, TCanvas, TLegend, TGra
 from officialStyle import officialStyle
 from DisplayManager import DisplayManager, add_Preliminary, add_CMS, add_label, applyLegendSettings, applyLegendSettings2
 import numpy as np
-from common import common_path, hlt_threshold_dict
+from common import hlt_threshold_dict
+from common import common_path
+from common import l1_ptmin, l1_ptmax, l1_ptstep, l1_ptlist
+from common import hlt_ptmin, hlt_ptmax, hlt_ptstep, hlt_ptlist
+from common import working_points
 import json
 
-#l1_ptrange = np.arange(5, 10.9, 1.0).tolist() 
-#hlt_ptrange = np.arange(4, 10.9, 1.0).tolist() 
+#l1_ptlist = np.arange(5, 10.9, 1.0).tolist() 
+#hlt_ptlist = np.arange(4, 10.9, 1.0).tolist() 
 
-l1_ptrange = np.arange(4, 11.5, 0.5).tolist() 
-hlt_ptrange = np.arange(4, 11.0, 0.5).tolist() 
+#l1_ptlist = np.arange(4, 11.5, 0.5).tolist() 
+#hlt_ptlist = np.arange(4, 11.0, 0.5).tolist() 
 
-print('l1', l1_ptrange)
-print('hlt', hlt_ptrange)
+print('l1', l1_ptlist)
+print('hlt', hlt_ptlist)
 
 gROOT.SetBatch(True)
 officialStyle(gStyle)
@@ -23,9 +27,10 @@ gStyle.SetOptStat(0)
 from optparse import OptionParser, OptionValueError
 usage = "usage: python runTauDisplay_BsTauTau.py"
 parser = OptionParser(usage)
-parser.add_option('-w', '--weight', action="store_true", default=True, dest='weight', help="weight by analysis eff")
+parser.add_option('-w', '--weight', action="store_true", default=False, dest='weight', help="weight by analysis eff")
 parser.add_option('-r', '--rates', action="store_true", default=False, dest='rates', help="write trigger rates to JSON")
 parser.add_option('-c', '--corrected', action="store_true", default=False, dest='corrected', help="apply trigger rates correction factor")
+parser.add_option('-m', '--muon', action="store_true", default=False, dest='muon', help="add single-muon reference eff/rate")
 (options, args) = parser.parse_args()
 
 
@@ -147,13 +152,15 @@ def createROCPdf(effmap, l1_file_rate, file_rate, file_ref, npu, name):
         #print(corrs_dict)
         #quit()
 
-    for l1pt in l1_ptrange:
+    #for l1pt in l1_ptlist:
+    for il1, l1pt in enumerate(l1_ptlist):
 
         rates = []
         effs = []
     
-        for hltpt in hlt_ptrange:
-
+        #for hltpt in hlt_ptlist:
+        for ihlt, hltpt in enumerate(hlt_ptlist):
+            if working_points==True and il1 != ihlt : continue
 
             #print(l1pt, hltpt, type(l1pt), type(hltpt))
             xbin = effmap.GetXaxis().FindBin(l1pt)
@@ -245,24 +252,25 @@ def createROCPdf(effmap, l1_file_rate, file_rate, file_ref, npu, name):
         #outfile.write(json_string)
         outfile.close()
 
-    for iref, refname in enumerate(['Mu9_IP6']):#['Mu12_IP6', 'Mu9_IP6', 'Mu9_IP5', 'Mu8_IP5', 'Mu7_IP4']):
+    if options.muon:
+        for iref, refname in enumerate(['Mu9_IP6']):#['Mu12_IP6', 'Mu9_IP6', 'Mu9_IP5', 'Mu8_IP5', 'Mu7_IP4']):
 
-        graph_ref = TGraph()
-        graph_ref.SetName('ref_' + refname)
-        graph_ref.SetTitle('ref_' + refname)
+            graph_ref = TGraph()
+            graph_ref.SetName('ref_' + refname)
+            graph_ref.SetTitle('ref_' + refname)
 
-        rate_ref = file_ref.Get(refname)
+            rate_ref = file_ref.Get(refname)
 
-#        print(refname, 0, effrefs[refname], rate_ref.Eval(options.pu)*2544.)
-        graph_ref.SetPoint(0, effrefs[refname], rate_ref.Eval(npu)*2544.)
-        if iref==0:
-            graph_ref.SetMarkerStyle(30)
-        else:
-            graph_ref.SetMarkerStyle(29)
+            # print(refname, 0, effrefs[refname], rate_ref.Eval(options.pu)*2544.)
+            graph_ref.SetPoint(0, effrefs[refname], rate_ref.Eval(npu)*2544.)
+            if iref==0:
+                graph_ref.SetMarkerStyle(30)
+            else:
+                graph_ref.SetMarkerStyle(29)
 
-        graph_ref.SetMarkerColor(colours_l1[iref])
-        graph_ref.SetMarkerSize(3)
-        graphs_ref.append(graph_ref)
+            graph_ref.SetMarkerColor(colours_l1[iref])
+            graph_ref.SetMarkerSize(3)
+            graphs_ref.append(graph_ref)
 
 
     # no envelope
@@ -360,8 +368,8 @@ def makeCanvas(name, weight, envelope, graphs, graphs_ref, npu):
     suffix1 = '_envelope' if envelope else ''
     suffix2 = '_weighted' if weight else ''
 
-    canvas.SaveAs('plots/' + name + '_' + str(npu).replace('.','p') +suffix1+suffix2+ '.gif')
-    canvas.SaveAs('plots/' + name + '_' + str(npu).replace('.','p') +suffix1+suffix2+ '.pdf')
+    canvas.SaveAs(common_path+'plots/' + name + '_' + str(npu).replace('.','p') +suffix1+suffix2+ '.gif')
+    canvas.SaveAs(common_path+'plots/' + name + '_' + str(npu).replace('.','p') +suffix1+suffix2+ '.pdf')
         
 
     if not envelope:
@@ -399,7 +407,8 @@ else: file_eff = TFile(common_path+'ee/effmap4roc_weighted.root')
 
 effmap = file_eff.Get('gall')
 
-file_ref = TFile(common_path+'single-mu/obs_rate_summary_fit.root')
+file_ref = None
+if options.muon: file_ref = TFile(common_path+'single-mu/obs_rate_summary_fit.root')
 #ref = file_ref.Get('Mu9_IP6')
 
 l1_file_rate = TFile(common_path+'ee/l1_bandwidth_official.root')

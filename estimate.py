@@ -66,7 +66,8 @@ ee_file = TFile(common_path+'ee/l1_bandwidth_official.root')
 integrated_lumi = 86.4 # 12-hour fill @ 2E34 delivers 0.864/fb 
 
 # L1 pT thresholds
-l1_ptrange = np.arange(4,11,0.5).tolist() 
+#l1_ptrange = [4.5,5.5,6.0,6.5,7.0,8.0,10.5] # restrict to the six L1 pT thresholds of the "default menu"
+l1_ptrange = np.arange(4,11,0.5).tolist() # <-- switch to using l1_ptlist ???
 
 # List of L_inst values to consider
 # Linst = nPU*0.0357338 - 0.0011904
@@ -578,7 +579,7 @@ for name,allocation,lumi,count,peaks,thresholds in summary:
 print()
 print("Per fill (Lint/fill, Counts for each allocation):")
 for name,counts in reversed(dct.items()):
-    print(name," ",end="")
+    print("{:20s}".format(name)," ",end="")
     print("{:0.2f}".format(counts[allocations[0]][0])," ",end="")
     for alloc in allocations: print("{:5.1f}".format(counts[alloc][1])," ",end="")
     print()
@@ -595,16 +596,18 @@ nfills['levelled_at_1p5e34'] = 12
 nfills['levelled_at_1p7e34'] = 12
 nfills['levelled_at_2p0e34'] = 12
 
-print("All fills (Lint/fill, Nfills, Lint all fills, Counts for each allocation):")
+#print("All fills (Lint/fill, Nfills, Lint all fills, Counts for each allocation):")
+print("Lumi profile          Lint   Nfill   Lint  Counts")
+print("                     /fill         /Nfill")
 Lint_total = 0.
 total = [0.]*len(allocations)
 for name,counts in reversed(dct.items()):
-    print(name," ",end="")
+    print("{:20s}".format(name)," ",end="")
     Lint = counts[allocations[0]][0]
     nfill = nfills.get(name,1.)
     Lint_total += Lint*nfill
     print("{:4.2f}".format(Lint)," ",end="")
-    print("{:2.0f}".format(nfill)," ",end="")
+    print("{:6.0f}".format(nfill)," ",end="")
     print("{:5.2f}".format(Lint*nfill)," ",end="")
     for ialloc,alloc in enumerate(allocations): 
         count = counts[alloc][1]
@@ -612,7 +615,7 @@ for name,counts in reversed(dct.items()):
         print("{:6.1f}".format(tot)," ",end="")
         total[ialloc] += tot
     print()
-print(" "*29,"{:5.2f} ".format(Lint_total),"  ".join(["{:6.1f}".format(t) for t in total]))
+print("Tot:"," "*30,"{:5.2f} ".format(Lint_total),"  ".join(["{:6.1f}".format(t) for t in total]))
 
 print()
 print("THE FOLLOWING ONLY WORKS WHEN RERUNNING FOR  EACH ALLOCATION IN TURN...!!!")
@@ -633,13 +636,14 @@ for name,_,_,_,peaks,_ in reversed(summary):
         tot_dC = dC*nfills.get(name,1.)
         dct2[peak_lumi][2] += tot_dC
         total_dC += tot_dC
-print("Peak Linst, Duration [s], Lint [/fb], Counts, (%)") 
+print("Linst     Time          Lint       Counts") 
+print("[E34]      [s]         [/fb] ") 
 for peak,[dt,dL,dC] in dct2.items():
-    print("{:4.1f} {:8.0f} {:4.2f} {:6.2f} ({:4.2f}) {:5.1f} ({:4.2f})".format(peak,
-                                                                               dt,dt/total_dt,
-                                                                               dL,dL/total_dL,
-                                                                               dC,dC/total_dC))
-print("Tot: {:8.0f}      {:6.2f}        {:5.1f}".format(total_dt,total_dL,total_dC))
+    print("{:5.1f} {:8.0f} ({:4.2f}) {:6.2f} ({:4.2f}) {:5.1f} ({:4.2f})".format(peak,
+                                                                                 dt,dt/total_dt,
+                                                                                 dL,dL/total_dL,
+                                                                                 dC,dC/total_dC))
+print("Tot:  {:8.0f}        {:6.2f}        {:5.1f}".format(total_dt,total_dL,total_dC))
 
 dct3 = {}
 total_dt = 0.
@@ -657,10 +661,11 @@ for name,_,_,_,_,thresholds in reversed(summary):
         tot_dC = dC*nfills.get(name,1.)
         dct3[threshold][2] += tot_dC
         total_dC += tot_dC
-print("pT threshold, Duration [s], Lint [/fb], Counts, (%)") 
+print("pT        Time          Lint       Counts")
+print("[Gev]      [s]         [/fb]") 
 for threshold,[dt,dL,dC] in dct3.items():
-    print("{:4.1f} {:8.0f} {:4.2f} {:6.2f} ({:4.2f}) {:5.1f} ({:4.2f})".format(threshold,
-                                                                               dt,dt/total_dt,
-                                                                               dL,dL/total_dL,
-                                                                               dC,dC/total_dC))
-print("Tot: {:8.0f}      {:6.2f}        {:5.1f}".format(total_dt,total_dL,total_dC))
+    print("{:5.1f} {:8.0f} ({:4.2f}) {:6.2f} ({:4.2f}) {:5.1f} ({:4.2f})".format(threshold,
+                                                                                 dt,dt/total_dt,
+                                                                                 dL,dL/total_dL,
+                                                                                 dC,dC/total_dC))
+print("Tot:  {:8.0f}        {:6.2f}        {:5.1f}".format(total_dt,total_dL,total_dC))

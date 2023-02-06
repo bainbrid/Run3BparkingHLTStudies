@@ -7,6 +7,12 @@ from officialStyle import officialStyle
 from array import array
 import numpy as np
 import itertools
+from common import common_path
+from common import l1_ptmin, l1_ptmax, l1_ptstep, l1_ptlist
+from common import hlt_ptmin, hlt_ptmax, hlt_ptstep, hlt_ptlist
+from common import working_points
+from common import timing
+import time
 
 gROOT.SetBatch(True)
 officialStyle(gStyle)
@@ -16,20 +22,8 @@ gStyle.SetOptStat(0)
 #gStyle.SetTitleOffset(1.0,"Y")
 gStyle.SetPadBottomMargin(0.22)
 
-l1_ptrange = np.arange(5, 12, 0.5).tolist() 
-hlt_ptrange = np.arange(4, 12, 0.5).tolist() 
-
-#l1_ptrange = np.arange(9.5, 9.6, 0.5).tolist() 
-#hlt_ptrange = np.arange(11.5, 11.6, 0.5).tolist() 
-
-#l1_ptrange = np.arange(7.5, 7.9, 0.5).tolist() 
-#hlt_ptrange = np.arange(4.5, 4.9, 0.5).tolist() 
-
-#l1_ptrange = np.arange(5, 7, 1.).tolist()
-#hlt_ptrange = np.arange(4, 6, 1.).tolist()
-
-#l1_ptrange = [5.0,10.0]
-#hlt_ptrange = [5.0,10.0]
+#l1_ptlist = np.arange(4, 12, 0.5).tolist() 
+#hlt_ptlist = np.arange(4, 12, 0.5).tolist() 
 
 const=float(2544.*11200)
 
@@ -141,23 +135,26 @@ def sproducer(key, rootfile, name, ivar, addsel = '1'):
 xtit = "Generator-level electron p_{T} [GeV]"
 xtit_b = "Generator-level B p_{T} [GeV]"
 
-ensureDir('plots_rate/')
+ensureDir('plots/')
+ensureDir('root/')
 
 set_palette()
 
 
-file = TFile('/pnfs/psi.ch/cms/trivcat/store/user/ytakahas/Trigger/job/HLT_data_rate_all/Myroot.root')
-#file = TFile('ratetest.root')
+file = TFile(common_path+'ee/hlt_data_for_rate_evaluation.root')
 tree = file.Get('tree')
 
-
-h_rate = TH2F('rate' , 'rate', len(l1_ptrange)-1, min(l1_ptrange), max(l1_ptrange), len(hlt_ptrange)-1, min(hlt_ptrange), max(hlt_ptrange))
+l1_nbin = int((l1_ptmax - l1_ptmin) / l1_ptstep)
+hlt_nbin = int((hlt_ptmax - hlt_ptmin) / hlt_ptstep)
+#h_rate = TH2F('rate' , 'rate', len(l1_ptlist)-1, min(l1_ptlist), max(l1_ptlist), len(hlt_ptlist)-1, min(hlt_ptlist), max(hlt_ptlist))
+h_rate = TH2F('rate' , 'rate', l1_nbin,l1_ptmin,l1_ptmax,hlt_nbin,hlt_ptmin,hlt_ptmax)
 
 h_rate.GetXaxis().SetTitle('L1 di-electron X GeV')
 h_rate.GetYaxis().SetTitle('HLT leading-electron Y GeV')
 
 
-h_rate_mass = TH2F('rate_mass' , 'rate_mass', len(l1_ptrange)-1, min(l1_ptrange), max(l1_ptrange), len(hlt_ptrange)-1, min(hlt_ptrange), max(hlt_ptrange))
+#h_rate_mass = TH2F('rate_mass' , 'rate_mass', len(l1_ptlist)-1, min(l1_ptlist), max(l1_ptlist), len(hlt_ptlist)-1, min(hlt_ptlist), max(hlt_ptlist))
+h_rate_mass = TH2F('rate_mass' , 'rate_mass', l1_nbin,l1_ptmin,l1_ptmax,hlt_nbin,hlt_ptmin,hlt_ptmax)
 
 h_rate_mass.GetXaxis().SetTitle('L1 di-electron X GeV')
 h_rate_mass.GetYaxis().SetTitle('HLT leading-electron Y GeV')
@@ -285,8 +282,8 @@ def effproducer(tree, hname, sel):
 #    leg2.AddEntry(hprof,   '{0:.2f}'.format(func.GetParameter(0)) + '*x^{3} + ' + '{0:.2f}'.format(func.GetParameter(1)) + '*x^{2}' + '{0:.2f}'.format(func.GetParameter(1)) + '*x', '')
 #    leg2.Draw()
 
-    can.SaveAs('plots_rate/' + hname + '.pdf')
-    can.SaveAs('plots_rate/' + hname + '.gif')
+    can.SaveAs('plots/' + hname + '.pdf')
+    can.SaveAs('plots/' + hname + '.gif')
 
     return copy.deepcopy(hprof), copy.deepcopy(hist), copy.deepcopy(func)
 
@@ -297,8 +294,13 @@ hists = []
 
 graphs = []
 
-for il1, l1_pt in enumerate(l1_ptrange):
-    for ihlt, hlt_pt in enumerate(hlt_ptrange):
+iloop = 0
+nloop = len(l1_ptlist)*len(hlt_ptlist) if working_points==False else len(l1_ptlist)
+start = time.time()
+for il1, l1_pt in enumerate(l1_ptlist):
+    for ihlt, hlt_pt in enumerate(hlt_ptlist):
+        if working_points==True and il1 != ihlt : continue
+        print("".join(["Processing #",str(iloop)," out of ",str(nloop)," triggers..."]))
         
         sel_den = 'isgjson==1'
             
@@ -309,8 +311,12 @@ for il1, l1_pt in enumerate(l1_ptrange):
         sel_num = '&&'.join([sel_den, sel_l1, sel_hlt])
         sel_num_mass = '&&'.join([sel_den, sel_l1, sel_hlt_mass])
 
-        h_rate.SetBinContent(il1+1, ihlt+1, calcRate(tree, sel_den, sel_num))
-        h_rate_mass.SetBinContent(il1+1, ihlt+1, calcRate(tree, sel_den, sel_num_mass))
+        xbin = h_rate.GetXaxis().FindBin(l1_pt+1.e-3)
+        ybin = h_rate.GetYaxis().FindBin(hlt_pt+1.e-3)
+        h_rate.SetBinContent(xbin, ybin, calcRate(tree, sel_den, sel_num))
+        xbin = h_rate_mass.GetXaxis().FindBin(l1_pt+1.e-3)
+        ybin = h_rate_mass.GetYaxis().FindBin(hlt_pt+1.e-3)
+        h_rate_mass.SetBinContent(xbin, ybin, calcRate(tree, sel_den, sel_num_mass))
 
         name = 'l1_' + str(l1_pt).replace('.','p') + '_hlt_'+ str(hlt_pt).replace('.', 'p')
 
@@ -318,6 +324,9 @@ for il1, l1_pt in enumerate(l1_ptrange):
 
         graphs.append(hprof)
         graphs.append(func)
+
+        timing(iloop,nloop,start,"loops")
+        iloop+=1
 
             #####
             #####
@@ -366,7 +375,7 @@ for il1, l1_pt in enumerate(l1_ptrange):
 
 
 
-ofile = TFile('ratemap.root', 'recreate')
+ofile = TFile(common_path+'ee/ratemap4roc.root', 'recreate')
 h_rate.Write()
 h_rate_mass.Write()
 

@@ -3,6 +3,7 @@ from ROOT import TFile, TH1F, TH2F, TTree, gROOT, gStyle, TCanvas, TLegend, TGra
 from officialStyle import officialStyle
 from DisplayManager import add_CMS, add_Preliminary
 import numpy as np
+from common import path
 
 l1_ptrange = np.arange(6, 11.5, 1).tolist() 
 hlt_ptrange = np.arange(4, 11.5, 1).tolist() 
@@ -18,11 +19,19 @@ gStyle.SetOptStat(0)
 from optparse import OptionParser, OptionValueError
 usage = "usage: python runTauDisplay_BsTauTau.py"
 parser = OptionParser(usage)
-parser.add_option('-w', '--weight', action="store_true", default=True, dest='weight')
-parser.add_option("-l", "--lumi", default=1.0, type="float", help="target lumi. with [E34]", dest="lumi")
+parser.add_option('-w', '--weight', action="store_true", default=False, dest='weight')
 parser.add_option('-p', '--pr', action="store_true", default=False, dest='pr')
 (options, args) = parser.parse_args()
 
+# Analysis efficiency map
+eff_histos = {}
+if options.pr and options.weight:
+    eff_file = TFile(path+'eff_maps/2022Jan19/eff.root')
+    #eff_histos['Mu7_IP4_match']  = eff_file.Get('eff_pt1_vs_pt2_qsq7_weighted')
+    #eff_histos['Mu8_IP5_match']  = eff_file.Get('eff_pt1_vs_pt2_qsq8_weighted') #@@ this eff is for Mu8_IP3!!
+    eff_histos['Mu9_IP6_match']  = eff_file.Get('tot16_pt1_vs_pt2_qsq9_weighted')
+    #eff_histos['Mu12_IP6_match'] = eff_file.Get('eff_pt1_vs_pt2_qsq12_weighted')
+    print('Found analysis efficiencies!',eff_histos)
 
 def returnGraph(name, rates, effs):
     graph = TGraph()
@@ -60,38 +69,39 @@ def applyLegendSettings(leg):
 
 
 def calc(name, num, den):
-    eff = num/den
+    eff = float(num)/float(den)
     efferr = 0.
     if num!=0:
-        efferr = math.sqrt(eff*(1-eff)/den)
-#    print(name.rjust(15), " numer: ",num, " denom: ", den, " eff: {0:.5f}".format(eff), " err: {0:.5f}".format(efferr))
-    print(name.replace('_', '\_').rjust(15), " & {0:.5f}".format(eff), " $\\pm$ {0:.5f}".format(efferr))
+        efferr = math.sqrt(eff*(1-eff)/float(den))
+    print(name.rjust(15), " numer: ",num, " denom: ", den, " eff: {0:.8f}".format(eff), " err: {0:.8f}".format(efferr))
+    #print(name.replace('_', '\_').rjust(15), " & {0:.5f}".format(eff), " $\\pm$ {0:.5f}".format(efferr))
     return eff, efferr
 
 
 
 hltmenus = {
-    'Mu12_IP6':{'xmin':20, 'xmax':40},
-    'Mu9_IP5':{'xmin':16, 'xmax':30},
-    'Mu7_IP4':{'xmin':16, 'xmax':24},
-    'Mu8_IP5':{'xmin':16, 'xmax':24},
-    'Mu8_IP6':{'xmin':16, 'xmax':24},
-    'Mu9_IP6':{'xmin':20, 'xmax':30},
-
-    'Mu12_IP6_match':{'xmin':20, 'xmax':40},
-    'Mu9_IP5_match':{'xmin':16, 'xmax':30},
-    'Mu7_IP4_match':{'xmin':16, 'xmax':24},
-    'Mu8_IP5_match':{'xmin':16, 'xmax':24},
-    'Mu8_IP6_match':{'xmin':16, 'xmax':24},
+#    'Mu12_IP6':{'xmin':20, 'xmax':40},
+#    'Mu9_IP5':{'xmin':16, 'xmax':30},
+#    'Mu7_IP4':{'xmin':16, 'xmax':24},
+#    'Mu8_IP5':{'xmin':16, 'xmax':24},
+#    'Mu8_IP6':{'xmin':16, 'xmax':24},
+#    'Mu9_IP6':{'xmin':20, 'xmax':30},
+#
+#    'Mu12_IP6_match':{'xmin':20, 'xmax':40},
+#    'Mu9_IP5_match':{'xmin':16, 'xmax':30},
+#    'Mu7_IP4_match':{'xmin':16, 'xmax':24},
+#    'Mu8_IP5_match':{'xmin':16, 'xmax':24},
+#    'Mu8_IP6_match':{'xmin':16, 'xmax':24},
     'Mu9_IP6_match':{'xmin':20, 'xmax':30},
 }
 
+ensureDir('plots')
 
 
-file = TFile('/pnfs/psi.ch/cms/trivcat/store/user/ytakahas/Trigger/Winter21_miniAOD_mc_anal_official/Myroot.root')
+file = TFile(path+'single-mu/gen_for_singlemu.root')
 tree = file.Get('tree')
 
-ratefile = TFile('root/rate.root')
+ratefile = TFile(path+'single-mu/obs_rate_summary.root')
 
 save2file = []
 
@@ -105,11 +115,42 @@ gen_q2  = '(gen_mass*gen_mass) > 1.1 && (gen_mass*gen_mass) < 6.25'
 for hlt, hltdict in hltmenus.items():
 
     if options.pr:
+        # Denominator
         den = tree.GetEntries()
-        num = tree.GetEntries(hlt + '==1')
-
+        # Numerator
+        num = 0.
+        numstr = hlt+'==1'
+        if not options.weight :
+            num = tree.GetEntries(numstr)
+        else :
+            gen_pt  = 'gen_e1_pt > 2.0 && gen_e2_pt > 2.0'
+            gen_eta = 'abs(gen_e1_eta) < 2.5 && abs(gen_e2_eta) < 2.5'
+            eff_histo = eff_histos.get(hlt,None)
+            if eff_histo is not None :
+                print(eff_histo)
+                ybins = eff_histo.GetYaxis().GetNbins()
+                xbins = eff_histo.GetXaxis().GetNbins()
+                cntr=0
+                for ybin in range(1,ybins+1):
+                    for xbin in range(1,xbins+1):
+                        if xbin > ybin : continue
+                        print("".join(["  ","#",str(cntr)," out of ",str(ybins*xbins/2.)]))
+                        cntr+=1
+                        eff = eff_histo.GetBinContent(xbin,ybin)
+                        y_down = eff_histo.GetYaxis().GetBinLowEdge(ybin)
+                        y_up = eff_histo.GetYaxis().GetBinLowEdge(ybin) + eff_histo.GetYaxis().GetBinWidth(ybin)
+                        x_down = eff_histo.GetXaxis().GetBinLowEdge(xbin)
+                        x_up = eff_histo.GetXaxis().GetBinLowEdge(xbin) + eff_histo.GetXaxis().GetBinWidth(xbin)
+                        gen_e1_pt = 'gen_e1_pt > ' + str(y_down)
+                        if ybin < ybins : gen_e1_pt += ' && ' + 'gen_e1_pt < ' + str(y_up)
+                        gen_e2_pt = 'gen_e2_pt > ' + str(x_down)
+                        if xbin < xbins : gen_e2_pt += ' && ' + 'gen_e2_pt < ' + str(x_up)
+                        newgencut = ' && '.join([gen_e1_pt, gen_e2_pt, gen_pt, gen_eta])
+                        entry = float(tree.GetEntries(numstr + ' && ' + newgencut))
+                        num += entry*eff
+            
         calc(hlt, num, den)
-        continue
+#        continue
 
     
     if hlt.find('match')!=-1: continue 
@@ -233,8 +274,9 @@ for hlt, hltdict in hltmenus.items():
 #canvas.SaveAs('roc_hlt.gif')
 #canvas.SaveAs('roc_hlt.pdf')
 
-if not options.pr:
-    out = TFile('dict.root', 'recreate')
+if len(save2file)!=0:
+    ensureDir('root')
+    out = TFile('../root/single-mu/obs_rate_summary_fit.root', 'recreate')
     for fit in save2file:
         fit.Write()
 

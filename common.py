@@ -12,7 +12,7 @@ from ROOT import TDatime, TFile, TGraph
 
 lxplus=True
 common_path='./root/current/'
-if lxplus==True: common_path='/eos/cms/store/group/phys_bphys/DiElectronX/RootFiles4Run3Parking/current/'
+if lxplus==True: common_path='/eos/cms/store/group/phys_bphys/DiElectronX/RootFiles4Run3Parking/Run2_legacy'
 
 ################################################################################
 # Define L1 and HLT thresholds to use

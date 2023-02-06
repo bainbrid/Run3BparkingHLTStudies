@@ -10,10 +10,20 @@ def applyLegendSettings(leg):
     leg.SetTextSize(0.05)
 #    leg.SetTextFont(42)
 
+def applyLegendSettings2(leg):     
+    leg.SetBorderSize(0)           
+    leg.SetFillColor(10)           
+    leg.SetLineColor(0)            
+    leg.SetFillStyle(0)            
+    leg.SetTextSize(0.05)          
+    leg.SetTextFont(42)     
 
-def add_CMS():
-    lowX=0.15
-    lowY=0.84
+
+
+
+def add_CMS(x=0.15,y=0.84):
+    lowX=x
+    lowY=y
     lumi  = ROOT.TPaveText(lowX, lowY+0.06, lowX+0.15, lowY+0.16, "NDC")
     lumi.SetTextFont(61)
     lumi.SetTextSize(0.055)
@@ -40,6 +50,18 @@ def add_label():
     return lumi
 
 
+def add_lumi(value,x=0.6,y=0.835):
+    lowX=x
+    lowY=y
+    lumi = ROOT.TPaveText(lowX, lowY+0.06, lowX+0.15, lowY+0.16, "NDC")
+#    lumi.SetTextFont(52)
+    lumi.SetTextSize(0.04)
+    lumi.SetBorderSize(   0 )
+    lumi.SetFillStyle(    0 )
+    lumi.SetTextAlign(   12 )
+    lumi.SetTextColor(    1 )
+    lumi.AddText("{:.2f}".format(value)+" fb^{-1}")
+    return lumi
 
 def add_Preliminary():
 #    lowX=0.13
@@ -56,9 +78,9 @@ def add_Preliminary():
     return lumi
 
 
-def add_Private():
-    lowX=0.5
-    lowY=0.835
+def add_Private(text="Private work in progress",x=0.5,y=0.835):
+    lowX=x
+    lowY=y
     lumi  = ROOT.TPaveText(lowX, lowY+0.06, lowX+0.15, lowY+0.16, "NDC")
 #    lumi.SetTextFont(52)
     lumi.SetTextSize(0.045)
@@ -66,7 +88,7 @@ def add_Private():
     lumi.SetFillStyle(    0 )
     lumi.SetTextAlign(   12 )
     lumi.SetTextColor(    1 )
-    lumi.AddText("Private work in progress")
+    lumi.AddText(text)
 #    lumi.AddText("#it{Private Work}")
     return lumi
 

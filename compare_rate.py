@@ -1,44 +1,34 @@
 import copy, math, os
 from numpy import array
 #from CMGTools.H2TauTau.proto.plotter.categories_TauMu import cat_Inc
-from ROOT import TFile, TH1F, TH2F, TTree, gROOT, gStyle, TCanvas, TColor, kLightTemperature, TGraphErrors
+from ROOT import TFile, TH1F, TH2F, TTree, gROOT, gStyle, TCanvas, TColor, kLightTemperature, TGraphErrors, kRed, TGaxis, gPad, kRed, TF1, TLegend
 from DisplayManager import DisplayManager, add_Preliminary, add_CMS, add_label
 from officialStyle import officialStyle
 from array import array
 import numpy as np
 import itertools
+from common import common_path
+from common import l1_ptmin, l1_ptmax, l1_ptstep, l1_ptlist
+from common import hlt_ptmin, hlt_ptmax, hlt_ptstep, hlt_ptlist
+from common import working_points
+from common import timing
+import time
 
 gROOT.SetBatch(True)
 officialStyle(gStyle)
 gStyle.SetOptTitle(0)
 gStyle.SetOptStat(0)
-gStyle.SetTitleOffset(1.0,"X")
-gStyle.SetTitleOffset(1.0,"Y")
+#gStyle.SetTitleOffset(1.0,"X")
+#gStyle.SetTitleOffset(1.0,"Y")
+gStyle.SetPadBottomMargin(0.22)
 
-l1_ptrange = np.arange(5, 12.5, 0.5).tolist() 
-hlt_ptrange = np.arange(4, 12.5, 0.5).tolist() 
+#l1_ptlist = np.arange(4, 12, 0.5).tolist() 
+#hlt_ptlist = np.arange(4, 12, 0.5).tolist() 
+
+const=float(2544.*11200)
 
 colours = [1, 2, 4, 6, 8, 13, 15]
 styles = [1, 2, 4, 3, 5, 1, 1]
-
-
-def overflow(hist):
-#    import pdb; pdb.set_trace()
-    lastp1 = hist.GetBinContent(hist.GetXaxis().GetNbins()+1)
-    last = hist.GetBinContent(hist.GetXaxis().GetNbins())
-    lastp1e = hist.GetBinError(hist.GetXaxis().GetNbins()+1)
-    laste = hist.GetBinError(hist.GetXaxis().GetNbins())
-    hist.SetBinContent(hist.GetXaxis().GetNbins(), last+lastp1)
-    hist.SetBinError(hist.GetXaxis().GetNbins(), math.sqrt(math.pow(laste,2)+math.pow(lastp1e,2)))
-    hist.SetBinContent(hist.GetXaxis().GetNbins()+1, 0)
-    hist.SetBinError(hist.GetXaxis().GetNbins()+1, 0)
-
-    firstp1 = hist.GetBinContent(1)
-    first = hist.GetBinContent(0)
-    firstp1e = hist.GetBinError(1)
-    firste = hist.GetBinError(0)
-    hist.SetBinContent(1, first+firstp1)
-    hist.SetBinError(1, math.sqrt(math.pow(firste,2)+math.pow(firstp1e,2)))
 
 
 
@@ -55,6 +45,14 @@ def calc(num, den):
 
     return eff, efferr
 
+
+def applyLegendSettings2(leg):     
+    leg.SetBorderSize(0)           
+    leg.SetFillColor(10)           
+    leg.SetLineColor(0)            
+    leg.SetFillStyle(0)            
+    leg.SetTextSize(0.05)          
+    leg.SetTextFont(42)     
 
 
 def set_palette(name="palette", ncontours=999):
@@ -137,56 +135,30 @@ def sproducer(key, rootfile, name, ivar, addsel = '1'):
 xtit = "Generator-level electron p_{T} [GeV]"
 xtit_b = "Generator-level B p_{T} [GeV]"
 
-trackreq = 'hlt_pms2 < 10000'
-#trackreq = '1'
+ensureDir('plots/')
+ensureDir('root/')
 
-vardict = {
-    'hlt_pt':{'tree':'tree', 'var':'hlt_pt', 'nbin':30, 'xmin':0, 'xmax':30, 'title':'E/gamma et (GeV)', 'sel':'1'}, 
-    'hlt_eta':{'tree':'tree', 'var':'hlt_eta', 'nbin':30, 'xmin':-1.5, 'xmax':1.5, 'title':'E/gamma eta', 'sel':'1'}, 
-    'hlt_phi':{'tree':'tree', 'var':'hlt_phi', 'nbin':30, 'xmin':-math.pi, 'xmax':math.pi, 'title':'E/gamma phi', 'sel':'1'}, 
-    'hlt_energy':{'tree':'tree', 'var':'hlt_energy', 'nbin':30, 'xmin':0, 'xmax':20, 'title':'E/gamma energy', 'sel':'1'}, 
-    'hlt_rawEnergy':{'tree':'tree', 'var':'hlt_rawEnergy', 'nbin':30, 'xmin':0, 'xmax':20, 'title':'E/gamma raw Energy', 'sel':'1'}, 
-    'hlt_phiWidth':{'tree':'tree', 'var':'hlt_phiWidth', 'nbin':30, 'xmin':0, 'xmax':0.25, 'title':'E/gamma phiWidth', 'sel':'1'}, 
-    'hlt_nrClus':{'tree':'tree', 'var':'hlt_nrClus', 'nbin':10, 'xmin':0, 'xmax':10, 'title':'E/gamma nrClus', 'sel':'1'}, 
-    'hlt_sigmalIEtaIEta':{'tree':'tree', 'var':'hlt_sigmaIEtaIEta', 'nbin':30, 'xmin':0, 'xmax':0.025, 'title':'sigmaIEtaIEta', 'sel':'1'}, 
-    'hlt_sigmalIEtaIEtaNoise':{'tree':'tree', 'var':'hlt_sigmaIEtaIEtaNoise', 'nbin':30, 'xmin':0, 'xmax':0.025, 'title':'sigmaIEtaIEtaNoise', 'sel':'1'}, 
-    'hlt_seednrCrystals':{'tree':'tree', 'var':'hlt_seednrCrystals', 'nbin':15, 'xmin':0, 'xmax':15, 'title':'seednrCrystals', 'sel':'1'}, 
-    'hlt_ecalPFIsol':{'tree':'tree', 'var':'hlt_ecalPFIsol', 'nbin':30, 'xmin':0, 'xmax':20, 'title':'ecalPFIsol', 'sel':'1'}, 
-    'hlt_hcalPFIsol':{'tree':'tree', 'var':'hlt_hcalPFIsol', 'nbin':30, 'xmin':0, 'xmax':20, 'title':'hcalPFIsol', 'sel':'1'}, 
-    'hlt_hcalHForHoverE':{'tree':'tree', 'var':'hlt_hcalHForHoverE', 'nbin':30, 'xmin':0, 'xmax':15, 'title':'hcalHForHoverE', 'sel':'1'}, 
-    'hlt_HE':{'tree':'tree', 'var':'hlt_hcalHForHoverE/hlt_energy', 'nbin':30, 'xmin':0, 'xmax':1, 'title':'H/E', 'sel':'1'}, 
-    'hlt_pms2':{'tree':'tree', 'var':'hlt_pms2', 'nbin':30, 'xmin':0, 'xmax':10000, 'title':'pms2', 'sel':'1'}, 
-
-    'hlt_dxy':{'tree':'tree', 'var':'hlt_dxy', 'nbin':50, 'xmin':-0.25, 'xmax':0.25, 'title':'dxy', 'sel':trackreq}, 
-#    'hlt_trkpt':{'tree':'tree', 'var':'hlt_trkpt', 'nbin':50, 'xmin':-0.25, 'xmax':0.25, 'title':'dxy', 'sel':trackreq}, 
-#    'hlt_trketa':{'tree':'tree', 'var':'hlt_', 'nbin':50, 'xmin':-0.25, 'xmax':0.25, 'title':'dxy', 'sel':trackreq}, 
-#    'hlt_trkphi':{'tree':'tree', 'var':'hlt_dxy', 'nbin':50, 'xmin':-0.25, 'xmax':0.25, 'title':'dxy', 'sel':trackreq}, 
-    'hlt_trkValidHits':{'tree':'tree', 'var':'hlt_trkValidHits', 'nbin':25, 'xmin':0, 'xmax':25, 'title':'trkvalidHits', 'sel':trackreq}, 
-    'hlt_trkIsol':{'tree':'tree', 'var':'hlt_trkIsol', 'nbin':30, 'xmin':0, 'xmax':15, 'title':'trk Isol', 'sel':trackreq}, 
-    'hlt_trkChi2':{'tree':'tree', 'var':'hlt_trkChi2', 'nbin':30, 'xmin':0, 'xmax':70, 'title':'trk Chi2', 'sel':trackreq}, 
-    'hlt_trkMissHits':{'tree':'tree', 'var':'hlt_trkMissHits', 'nbin':3, 'xmin':0, 'xmax':3, 'title':'trackMissHits', 'sel':trackreq}, 
-    'hlt_trkNrLayerIT':{'tree':'tree', 'var':'hlt_trkNrLayerIT', 'nbin':5, 'xmin':0, 'xmax':5, 'title':'trkNrLayerIT', 'sel':trackreq}, 
-    'hlt_trkDEta':{'tree':'tree', 'var':'hlt_trkDEta', 'nbin':30, 'xmin':0, 'xmax':0.05, 'title':'trkDEta', 'sel':trackreq}, 
-    'hlt_trkDEtaSeed':{'tree':'tree', 'var':'hlt_trkDEtaSeed', 'nbin':30, 'xmin':0, 'xmax':0.05, 'title':'trkDEtaSeed', 'sel':trackreq}, 
-    'hlt_trkDPhi':{'tree':'tree', 'var':'hlt_trkDPhi', 'nbin':30, 'xmin':0, 'xmax':0.6, 'title':'trkDPhi', 'sel':trackreq}, 
-    'hlt_invESeedInvP':{'tree':'tree', 'var':'hlt_invESeedInvP', 'nbin':30, 'xmin':0, 'xmax':0.8, 'title':'invESeedInvP', 'sel':trackreq},
-    'hlt_invEInvP':{'tree':'tree', 'var':'hlt_invEInvP', 'nbin':30, 'xmin':0, 'xmax':0.8, 'title':'invEInvP', 'sel':trackreq},
-
-    }
-
-ensureDir('plots_compare/')
+set_palette()
 
 
-
-
-file = TFile('ratetest.root')
+file = TFile(common_path+'ee/hlt_data_for_rate_evaluation.root')
 tree = file.Get('tree')
 
-
-h_rate = TH2F('rate' , 'rate', len(l1_ptrange)-1, min(l1_ptrange), max(l1_ptrange), len(hlt_ptrange)-1, min(hlt_ptrange), max(hlt_ptrange))
+l1_nbin = int((l1_ptmax - l1_ptmin) / l1_ptstep)
+hlt_nbin = int((hlt_ptmax - hlt_ptmin) / hlt_ptstep)
+#h_rate = TH2F('rate' , 'rate', len(l1_ptlist)-1, min(l1_ptlist), max(l1_ptlist), len(hlt_ptlist)-1, min(hlt_ptlist), max(hlt_ptlist))
+h_rate = TH2F('rate' , 'rate', l1_nbin,l1_ptmin,l1_ptmax,hlt_nbin,hlt_ptmin,hlt_ptmax)
 
 h_rate.GetXaxis().SetTitle('L1 di-electron X GeV')
 h_rate.GetYaxis().SetTitle('HLT leading-electron Y GeV')
+
+
+#h_rate_mass = TH2F('rate_mass' , 'rate_mass', len(l1_ptlist)-1, min(l1_ptlist), max(l1_ptlist), len(hlt_ptlist)-1, min(hlt_ptlist), max(hlt_ptlist))
+h_rate_mass = TH2F('rate_mass' , 'rate_mass', l1_nbin,l1_ptmin,l1_ptmax,hlt_nbin,hlt_ptmin,hlt_ptmax)
+
+h_rate_mass.GetXaxis().SetTitle('L1 di-electron X GeV')
+h_rate_mass.GetYaxis().SetTitle('HLT leading-electron Y GeV')
+
 
 def calcRate(tree, denstr, numstr):
     den = tree.GetEntries(denstr)
@@ -199,23 +171,217 @@ def calcRate(tree, denstr, numstr):
     return rate
 
 
-if True:
-    for il1, l1_pt in enumerate(l1_ptrange):
-        for ihlt, hlt_pt in enumerate(hlt_ptrange):
+def effproducer(tree, hname, sel):
+
+    print('producing ...', hname)
+
+#    hist = TH2F(hname, hname, 60,0,60, 2,-0.5,1.5)
+    hist = TH2F(hname, hname, 30,0,60, 2,-0.5,1.5)
+
+    tree.Draw(sel + ':npu' +  '>> ' + hname)
+
+    print(hname, '->', tree.GetEntries(sel), '/', tree.GetEntries())
+
+#    import pdb; pdb.set_trace()
+
+#    for ii in range(100000):
+#        hist.Fill(0,0)
+
+    hprof = hist.ProfileX()
+
+    # this is a bit dirty but ok ... 
+#    hprof.SetBinContent(1, 0.0000000039)
+#    hprof.SetBinError(1, 0.00000001)
+
+
+
+    hprof.Scale(const)
+    hprof.GetXaxis().SetTitle('# of PU / inst. L (E34)')
+    hprof.GetXaxis().SetTitleOffset(2.1)
+    hprof.GetYaxis().SetTitleOffset(1.3)
+    hprof.GetYaxis().SetMaxDigits(3)
+    hprof.GetYaxis().SetTitle('HLT trigger rate (Hz)')
+    hprof.GetYaxis().SetNdivisions(506)
+    hprof.SetTitle(hname)
+    hprof.SetName(hname)
+
+#    print(hprof.GetBinContent(1))
+
+
+    can = TCanvas('can_' + hname, 'can_' + hname)
+    can.SetGridx()
+    can.SetGridy()
+
+    hprof.Draw()
+    
+#    fitfunc = TF1('parabolla', '[0]*x*x*x + [1] *x*x + [2]*x', 0,60)
+
+#    fitfunc = TF1('expo_mod', 'exp([0] + [1]*x)', 0, 60)
+#    fitfunc = TF1('pol3_mod', '[0]*x*x*x + [1]*x*x + [2]*x', 0, 60)
+    fitfunc = TF1('pol3_mod', '[0]*x*x*x*x*x + [1]*x*x*x*x + [2]*x*x*x + [3]*x*x + [4]*x', 0, 60)
+#    fitfunc.SetParLimits(1, 0, 15)
+#    fitfunc.SetParLimits(0, -2, 2)
+#    fitfunc.FixParameter(0, -2.3)
+
+    fitfunc.SetParLimits(0, 0, 100)
+    fitfunc.SetParLimits(1, 0, 100)
+    fitfunc.SetParLimits(2, 0, 100)
+    fitfunc.SetParLimits(3, 0, 100)
+    fitfunc.SetParLimits(4, 0, 100)
+
+#    hprof.Fit("expo_mod")
+#    hprof.Fit("expo")
+    hprof.Fit("pol3_mod")
+#    hprof.Fit("parabolla")
+    
+#    func = hprof.GetFunction("pol3")
+#    func = hprof.GetFunction("expo_mod")
+    func = hprof.GetFunction("pol3_mod")
+#    func = hprof.GetFunction("expo")
+    print('fit param. = ',  func.GetParameter(0), func.GetParameter(1), func.GetParameter(2))
+
+#    func = hprof.GetFunction("parabolla")
+    func.SetLineColor(kRed)
+    func.SetLineStyle(2)
+    func.SetLineWidth(3)
+    func.Draw('same')
+    func.SetTitle(hname + '_fit')
+    func.SetName(hname + '_fit')
+
+#    print 'test1', gPad.GetUxmin(), gPad.GetUxmax(), gPad.GetUymin(), gPad.GetUymax()
+#    print 'test2', Double(60)*0.0357338
+
+#    axis = TGaxis(gPad.GetUxmin(), gPad.GetUymin(),
+#                  gPad.GetUxmax(), gPad.GetUymin(), 0, Double(60)*0.0357338, 510,"+L");
+
+    delta = hprof.GetMaximum() - hprof.GetMinimum()
+    y = hprof.GetMinimum() - 0.15*delta
+
+    print( hprof.GetMaximum(), hprof.GetMinimum(), 'delta=', delta, 'y=', y)
+    axis = TGaxis(0, y, 60, y, 0, 60.*0.0357338-0.0011904, 506, "+L")
+    axis.SetLabelFont(42)
+    axis.SetLabelSize(0.05)
+#    gPad.GetUxmax(), gPad.GetUymin(), 0, Double(60)*0.0357338, 510,"+L")
+#    axis.SetLineColor(kRed)
+#    axis->SetLabelColor(kRed)
+    axis.Draw();
+
+
+    leg = TLegend(0.19, 0.81,0.3,0.86)
+    applyLegendSettings2(leg)
+    leg.SetTextSize(0.032)
+    leg.SetTextFont(62)
+    leg.AddEntry(hprof,   'L1: p_{T} > ' + hname.split('_')[1].replace('p','.') + 'GeV, HLT: p_{T} > ' + hname.split('_')[3].replace('p','.') + 'GeV', '')
+    leg.Draw()
+
+#    leg2 = TLegend(0.19, 0.76,0.3,0.8)
+#    applyLegendSettings2(leg2)
+#    leg2.SetTextSize(0.032)
+#    leg2.SetTextFont(62)
+#    leg2.AddEntry(hprof,   'exp(' + '{0:.2f}'.format(func.GetParameter(0)) + '+' + '{0:.2f}'.format(func.GetParameter(1)) + '*x)', '')
+#    leg2.AddEntry(hprof,   '{0:.2f}'.format(func.GetParameter(0)) + '*x^{3} + ' + '{0:.2f}'.format(func.GetParameter(1)) + '*x^{2}' + '{0:.2f}'.format(func.GetParameter(1)) + '*x', '')
+#    leg2.Draw()
+
+    can.SaveAs('plots/' + hname + '.pdf')
+    can.SaveAs('plots/' + hname + '.gif')
+
+    return copy.deepcopy(hprof), copy.deepcopy(hist), copy.deepcopy(func)
+
+
+
+
+hists = []
+
+graphs = []
+
+iloop = 0
+nloop = len(l1_ptlist)*len(hlt_ptlist) if working_points==False else len(l1_ptlist)
+start = time.time()
+for il1, l1_pt in enumerate(l1_ptlist):
+    for ihlt, hlt_pt in enumerate(hlt_ptlist):
+        if working_points==True and il1 != ihlt : continue
+        print("".join(["Processing #",str(iloop)," out of ",str(nloop)," triggers..."]))
         
-            sel_den = 'isgjson==1'
+        sel_den = 'isgjson==1'
             
-            sel_l1 = 'l1_doubleE' + str(l1_pt) + '==1'
-            sel_hlt = 'doubleE' + str(hlt_pt) + '==1'
+        sel_l1 = 'l1_doubleE' + str(l1_pt).replace('.','p') + '==1'
+        sel_hlt = 'doubleE' + str(hlt_pt).replace('.','p') + '==1'
+        sel_hlt_mass = 'mass_doubleE' + str(hlt_pt).replace('.','p') + '==1'
 
-            sel_num = '&&'.join([sel_den, sel_l1, sel_hlt])
+        sel_num = '&&'.join([sel_den, sel_l1, sel_hlt])
+        sel_num_mass = '&&'.join([sel_den, sel_l1, sel_hlt_mass])
 
-            h_rate.SetBinContent(il1+1, ihlt+1, calcRate(tree, sel_den, sel_num))
+        xbin = h_rate.GetXaxis().FindBin(l1_pt+1.e-3)
+        ybin = h_rate.GetYaxis().FindBin(hlt_pt+1.e-3)
+        h_rate.SetBinContent(xbin, ybin, calcRate(tree, sel_den, sel_num))
+        xbin = h_rate_mass.GetXaxis().FindBin(l1_pt+1.e-3)
+        ybin = h_rate_mass.GetYaxis().FindBin(hlt_pt+1.e-3)
+        h_rate_mass.SetBinContent(xbin, ybin, calcRate(tree, sel_den, sel_num_mass))
+
+        name = 'l1_' + str(l1_pt).replace('.','p') + '_hlt_'+ str(hlt_pt).replace('.', 'p')
+
+        hprof, hist, func = effproducer(tree, name, sel_num_mass)
+
+        graphs.append(hprof)
+        graphs.append(func)
+
+        timing(iloop,nloop,start,"loops")
+        iloop+=1
+
+            #####
+            #####
+
+###            sel_dep = '&&'.join([sel_l1, sel_hlt])
+###
+###            hname = 'l1_' + str(l1_pt) + '_hlt_' + str(hlt_pt)
+###            hist = TH2F(hname, hname, 60,0,2, 2,-0.5,1.5)
+###
+###            tree.Draw(sel_dep + ':instL' +  '>> ' + hname, sel_den)
+###
+####            print hname, '->', tree.GetEntries(sel), '/', tree.GetEntries()
+###
+###            hprof = hist.ProfileX()
+###            hprof.Scale(const)
+###            #    hprof.GetXaxis().SetTitle('# of PU')
+###            #    hprof.GetXaxis().SetTitleOffset(1.5)
+###            hprof.GetYaxis().SetTitle('Trigger Rate')
+###            hprof.GetYaxis().SetNdivisions(506)
+###            hprof.SetTitle(hname)
+###            hprof.SetName(hname)
+###
+###            can = TCanvas('can_' + hname, 'can_' + hname)
+###            can.SetGridx()
+###            can.SetGridy()
+###            
+###            hprof.Draw()
+###            hprof.Fit("pol3")
+###            
+###            func = hprof.GetFunction("pol3")
+###            func.SetLineColor(kRed)
+###            func.SetLineStyle(2)
+###            func.SetLineWidth(3)
+###            func.Draw('same')
+###            func.SetTitle(hname + '_fit')
+###            
+###            func.SetName(hname + '_fit')
+###            can.SaveAs('plots/' + hname + '.pdf')
+###            can.SaveAs('plots/' + hname + '.gif')
+###
+###            hists.append((hprof, func))
+            
+#            return copy.deepcopy(hprof), copy.deepcopy(hist), copy.deepcopy(func)
 
 
-    ofile = TFile('ratemap.root', 'recreate')
-    h_rate.Write()
 
-    ofile.Write()
-    ofile.Close()
+
+
+ofile = TFile(common_path+'ee/ratemap4roc.root', 'recreate')
+h_rate.Write()
+h_rate_mass.Write()
+
+for graph in graphs:
+    graph.Write()
+
+ofile.Write()
+ofile.Close()
 
